@@ -6,6 +6,14 @@ class SQLParser:
     def __init__(self):
         pass
         
+    def normalize_sql_definition(self, definition):
+        """标准化SQL定义，统一大小写和格式"""
+        # 将定义转换为大写
+        definition = definition.upper()
+        # 标准化空格
+        definition = ' '.join(definition.split())
+        return definition
+        
     def parse_file(self, file_path):
         """解析SQL文件，返回表结构字典"""
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -75,7 +83,11 @@ class SQLParser:
                         if len(parts) >= 2:
                             col_name = parts[0].strip('`')
                             col_type = parts[1].strip()
-                            columns[col_name] = col_type
+                            # 存储原始定义和标准化后的定义
+                            columns[col_name] = {
+                                'raw': col_type,
+                                'normalized': self.normalize_sql_definition(col_type)
+                            }
                             
             if table_name:
                 tables[table_name] = {
@@ -114,12 +126,12 @@ class SQLParser:
             # 比较列定义
             if left_cols != right_cols:
                 table_diffs['columns'] = {
-                    'added_columns': {col: defn for col, defn in right_cols.items() if col not in left_cols},
-                    'removed_columns': {col: defn for col, defn in left_cols.items() if col not in right_cols},
+                    'added_columns': {col: defn['raw'] for col, defn in right_cols.items() if col not in left_cols},
+                    'removed_columns': {col: defn['raw'] for col, defn in left_cols.items() if col not in right_cols},
                     'modified_columns': {
-                        col: {'left': left_cols[col], 'right': right_cols[col]}
+                        col: {'left': left_cols[col]['raw'], 'right': right_cols[col]['raw']}
                         for col in set(left_cols.keys()) & set(right_cols.keys())
-                        if left_cols[col] != right_cols[col]
+                        if left_cols[col]['normalized'] != right_cols[col]['normalized']
                     }
                 }
             

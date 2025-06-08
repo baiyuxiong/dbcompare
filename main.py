@@ -3,6 +3,9 @@ from tkinter import ttk, filedialog, scrolledtext, messagebox
 import threading
 from sql_parser import SQLParser
 from sql_generator import SQLGenerator
+from connection_dialog import ConnectionDialog
+from models import ConnectionManager, Connection, History
+from datetime import datetime
 
 class SQLCompareApp:
     def __init__(self, root):
@@ -12,6 +15,8 @@ class SQLCompareApp:
         
         # 初始化变量
         self.sync_scroll = tk.BooleanVar(value=True)
+        self.hide_same = tk.BooleanVar(value=False)  # 添加隐藏相同行变量
+        self.show_missing_only = tk.BooleanVar(value=False)  # 添加仅显示缺失变量
         self.left_tables = {}
         self.right_tables = {}
         
@@ -22,6 +27,9 @@ class SQLCompareApp:
         # 创建菜单栏
         self.create_menu()
         
+        # 初始化连接管理器
+        self.connection_manager = ConnectionManager()
+        
         # 创建主内容区
         self.create_main_content()
 
@@ -30,6 +38,10 @@ class SQLCompareApp:
     def create_menu(self):
         menu_frame = ttk.Frame(self.root)
         menu_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        # 添加连接管理按钮
+        conn_btn = ttk.Button(menu_frame, text="连接管理", command=self._show_connection_dialog)
+        conn_btn.pack(side=tk.LEFT, padx=5)
         
         compare_btn = ttk.Button(menu_frame, text="开始比较", command=self.start_compare)
         compare_btn.pack(side=tk.LEFT, padx=5)
@@ -46,16 +58,84 @@ class SQLCompareApp:
         )
         sync_check.pack(side=tk.LEFT, padx=5)
         
+        # 添加隐藏相同行开关
+        hide_same_check = ttk.Checkbutton(
+            menu_frame,
+            text="隐藏相同行",
+            variable=self.hide_same,
+            command=self.show_differences  # 当切换时重新显示差异
+        )
+        hide_same_check.pack(side=tk.LEFT, padx=5)
+        
+        # 添加仅显示缺失开关
+        show_missing_check = ttk.Checkbutton(
+            menu_frame,
+            text="仅显示缺失",
+            variable=self.show_missing_only,
+            command=self.show_differences  # 当切换时重新显示差异
+        )
+        show_missing_check.pack(side=tk.LEFT, padx=5)
+        
     def create_main_content(self):
         content_frame = ttk.Frame(self.root)
         content_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         # 左侧面板
-        left_frame = ttk.LabelFrame(content_frame, text="左侧SQL文件")
-        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
+        left_frame = ttk.LabelFrame(content_frame, text="左侧数据源")
+        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
         
-        self.left_file_btn = ttk.Button(left_frame, text="选择SQL文件", command=lambda: self.select_file("left"))
-        self.left_file_btn.pack(pady=5)
+        # 左侧选择框架
+        left_select_frame = ttk.Frame(left_frame)
+        left_select_frame.pack(fill=tk.X, pady=5)
+        
+        # 左侧工具栏
+        left_toolbar = ttk.Frame(left_select_frame)
+        left_toolbar.pack(side=tk.LEFT, fill=tk.X, padx=5)
+        
+        # 左侧连接按钮
+        self.left_conn_btn = ttk.Button(left_toolbar, text="连接", 
+                                      command=lambda: self._show_connection_dialog("left"))
+        self.left_conn_btn.pack(side=tk.LEFT, padx=2)
+        
+        # 左侧文件按钮
+        self.left_file_btn = ttk.Button(left_toolbar, text="文件", 
+                                      command=lambda: self.select_file("left"))
+        self.left_file_btn.pack(side=tk.LEFT, padx=2)
+        
+        # 左侧历史记录下拉框
+        self.left_history_combo = ttk.Combobox(left_select_frame, state="readonly", width=50)
+        self.left_history_combo.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        self.left_history_combo.bind("<<ComboboxSelected>>", lambda e: self._on_history_select("left"))
+        
+        # 右侧面板
+        right_frame = ttk.LabelFrame(content_frame, text="右侧数据源")
+        right_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(5, 0))
+        
+        # 右侧选择框架
+        right_select_frame = ttk.Frame(right_frame)
+        right_select_frame.pack(fill=tk.X, pady=5)
+        
+        # 右侧工具栏
+        right_toolbar = ttk.Frame(right_select_frame)
+        right_toolbar.pack(side=tk.LEFT, fill=tk.X, padx=5)
+        
+        # 右侧连接按钮
+        self.right_conn_btn = ttk.Button(right_toolbar, text="连接", 
+                                       command=lambda: self._show_connection_dialog("right"))
+        self.right_conn_btn.pack(side=tk.LEFT, padx=2)
+        
+        # 右侧文件按钮
+        self.right_file_btn = ttk.Button(right_toolbar, text="文件", 
+                                       command=lambda: self.select_file("right"))
+        self.right_file_btn.pack(side=tk.LEFT, padx=2)
+        
+        # 右侧历史记录下拉框
+        self.right_history_combo = ttk.Combobox(right_select_frame, state="readonly", width=50)
+        self.right_history_combo.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        self.right_history_combo.bind("<<ComboboxSelected>>", lambda e: self._on_history_select("right"))
+        
+        # 初始化历史记录列表
+        self._update_history_lists()
         
         # 创建左侧表格
         self.left_tree = ttk.Treeview(left_frame, columns=("index", "field", "definition"), show="headings")
@@ -66,13 +146,6 @@ class SQLCompareApp:
         self.left_tree.column("field", width=150)
         self.left_tree.column("definition", width=400)
         self.left_tree.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        
-        # 右侧面板
-        right_frame = ttk.LabelFrame(content_frame, text="右侧SQL文件")
-        right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=5)
-        
-        self.right_file_btn = ttk.Button(right_frame, text="选择SQL文件", command=lambda: self.select_file("right"))
-        self.right_file_btn.pack(pady=5)
         
         # 创建右侧表格
         self.right_tree = ttk.Treeview(right_frame, columns=("index", "field", "definition"), show="headings")
@@ -93,7 +166,6 @@ class SQLCompareApp:
             
         # 同步选择功能
         def on_tree_click(event, source_tree, target_tree):
-            
             def sync_selection():
                 # 获取当前选中的项
                 selected_items = source_tree.selection()
@@ -118,7 +190,6 @@ class SQLCompareApp:
                     pass
             
             # 使用after方法延迟执行同步操作
-            # 首先触发<Button-1>事件,然后Tkinter才会更新selection()的状态，前面用source_tree.selection()，这里要延时等更新后处理
             source_tree.after(100, sync_selection)
         
         # 绑定点击事件
@@ -175,18 +246,41 @@ class SQLCompareApp:
             
         self.root.after(100, delayed_scroll)
 
-    def select_file(self, side):
+    def select_file(self, side: str):
         file_path = filedialog.askopenfilename(
+            title="选择SQL文件",
             filetypes=[("SQL files", "*.sql"), ("All files", "*.*")]
         )
         if file_path:
+            # 添加到历史记录
+            history = History(
+                id=None,
+                side=side,
+                type="file",
+                value=file_path,
+                display=file_path,
+                last_used=datetime.now()
+            )
+            self.connection_manager.add_history(history)
+            
+            # 更新历史记录列表
+            self._update_history_lists()
+            
+            # 设置当前选择
             if side == "left":
-                self.left_file_path = file_path
-                self.left_file_btn.config(text=f"已选择: {file_path.split('/')[-1]}")
+                self.left_history_combo.set(file_path)
             else:
-                self.right_file_path = file_path
-                self.right_file_btn.config(text=f"已选择: {file_path.split('/')[-1]}")
+                self.right_history_combo.set(file_path)
                 
+            # 解析SQL文件
+            if side == "left":
+                self.left_tables = self.sql_parser.parse_file(file_path)
+            else:
+                self.right_tables = self.sql_parser.parse_file(file_path)
+                
+            # 显示差异
+            self.show_differences()
+
     def start_compare(self):
         if not hasattr(self, 'left_file_path') or not hasattr(self, 'right_file_path'):
             messagebox.showerror("错误", "请先选择两个SQL文件")
@@ -234,6 +328,17 @@ class SQLCompareApp:
             left_index_count = len(left_indexes)
             right_index_count = len(right_indexes)
             
+            # 检查表是否有差异
+            has_table_differences = (
+                table_name in differences.get('modified_tables', {}) or
+                table_name in differences.get('added_tables', []) or
+                table_name in differences.get('removed_tables', [])
+            )
+            
+            # 如果启用了隐藏相同行且表没有差异，则跳过
+            if self.hide_same.get() and not has_table_differences:
+                continue
+            
             # 添加表头
             self.left_tree.insert("", "end", values=(f"表{table_index}", f"表名: {table_name}", f"字段数: {left_count} 索引数: {left_index_count}"), tags=("table_header",))
             self.right_tree.insert("", "end", values=(f"表{table_index}", f"表名: {table_name}", f"字段数: {right_count} 索引数: {right_index_count}"), tags=("table_header",))
@@ -255,26 +360,46 @@ class SQLCompareApp:
                     left_tags = []
                     right_tags = []
                     
+                    has_column_differences = False
+                    is_missing = False
                     if table_name in differences.get('modified_tables', {}):
                         changes = differences['modified_tables'][table_name]
                         if 'columns' in changes:
                             cols_changes = changes['columns']
-                            if col_name in cols_changes.get('removed_columns', []):
+                            if col_name in cols_changes.get('removed_columns', {}):
                                 left_tags.append("different")
-                            if col_name in cols_changes.get('added_columns', []):
+                                has_column_differences = True
+                            if col_name in cols_changes.get('added_columns', {}):
                                 right_tags.append("different")
-                            if col_name in cols_changes.get('modified_columns', []):
+                                has_column_differences = True
+                            if col_name in cols_changes.get('modified_columns', {}):
                                 left_tags.append("different")
                                 right_tags.append("different")
+                                has_column_differences = True
                     
                     if not left_def and right_def:
                         left_tags.append("missing")
+                        has_column_differences = True
+                        is_missing = True
                     if not right_def and left_def:
                         right_tags.append("missing")
+                        has_column_differences = True
+                        is_missing = True
                     
-                    # 插入行
-                    self.left_tree.insert("", "end", values=(col_index, col_name, left_def or "[缺失]"), tags=tuple(left_tags))
-                    self.right_tree.insert("", "end", values=(col_index, col_name, right_def or "[缺失]"), tags=tuple(right_tags))
+                    # 如果启用了隐藏相同行且字段没有差异，则跳过
+                    if self.hide_same.get() and not has_column_differences:
+                        continue
+                        
+                    # 如果启用了仅显示缺失且不是缺失字段，则跳过
+                    if self.show_missing_only.get() and not is_missing:
+                        continue
+                    
+                    # 插入行，使用raw值
+                    left_def_display = left_def.get('raw', '') if isinstance(left_def, dict) else left_def
+                    right_def_display = right_def.get('raw', '') if isinstance(right_def, dict) else right_def
+                    
+                    self.left_tree.insert("", "end", values=(col_index, col_name, left_def_display or "[缺失]"), tags=tuple(left_tags))
+                    self.right_tree.insert("", "end", values=(col_index, col_name, right_def_display or "[缺失]"), tags=tuple(right_tags))
                 
             # 添加索引信息
             all_indexes = sorted(set(list(left_indexes.keys()) + list(right_indexes.keys())))
@@ -295,6 +420,8 @@ class SQLCompareApp:
                     # 确定标签
                     left_tags = []
                     right_tags = []
+                    has_index_differences = False
+                    is_missing = False
                     
                     if table_name in differences.get('modified_tables', {}):
                         changes = differences['modified_tables'][table_name]
@@ -302,16 +429,31 @@ class SQLCompareApp:
                             idx_changes = changes['indexes']
                             if idx_name in idx_changes.get('removed_indexes', []):
                                 left_tags.append("different")
+                                has_index_differences = True
                             if idx_name in idx_changes.get('added_indexes', []):
                                 right_tags.append("different")
+                                has_index_differences = True
                             if idx_name in idx_changes.get('modified_indexes', []):
                                 left_tags.append("different")
                                 right_tags.append("different")
+                                has_index_differences = True
                     
                     if not left_idx_def and right_idx_def:
                         left_tags.append("missing")
+                        has_index_differences = True
+                        is_missing = True
                     if not right_idx_def and left_idx_def:
                         right_tags.append("missing")
+                        has_index_differences = True
+                        is_missing = True
+                    
+                    # 如果启用了隐藏相同行且索引没有差异，则跳过
+                    if self.hide_same.get() and not has_index_differences:
+                        continue
+                        
+                    # 如果启用了仅显示缺失且不是缺失索引，则跳过
+                    if self.show_missing_only.get() and not is_missing:
+                        continue
                     
                     # 插入行
                     self.left_tree.insert("", "end", values=(idx_index, idx_name, left_idx_def or "[缺失]"), tags=tuple(left_tags))
@@ -347,6 +489,83 @@ class SQLCompareApp:
             
         except Exception as e:
             messagebox.showerror("错误", f"生成同步SQL时出错: {str(e)}")
+
+    def _show_connection_dialog(self, side: str = None):
+        dialog = ConnectionDialog(self.root, self.connection_manager, lambda conn: self._on_connection_selected(side, conn))
+        dialog.grab_set()
+        
+    def _on_connection_selected(self, side: str, connection: Connection):
+        # 生成显示文本
+        if connection.type == "mysql":
+            config = connection.config
+            display = f"{connection.name} ({config['host']}:{config['port']})"
+        else:
+            display = f"{connection.name} ({connection.config['url']})"
+            
+        # 添加到历史记录
+        history = History(
+            id=None,
+            side=side,
+            type="connection",
+            value=connection.name,
+            display=display,
+            last_used=datetime.now()
+        )
+        self.connection_manager.add_history(history)
+        
+        # 更新历史记录列表
+        self._update_history_lists()
+        
+        # 设置当前选择
+        if side == "left":
+            self.left_history_combo.set(display)
+        else:
+            self.right_history_combo.set(display)
+            
+        # TODO: 从数据库获取表结构
+        # 这里需要实现从数据库获取表结构的功能
+        
+    def _update_history_lists(self):
+        # 获取历史记录
+        left_history = self.connection_manager.get_history("left")
+        right_history = self.connection_manager.get_history("right")
+        
+        # 更新左侧历史记录列表
+        self.left_history_combo["values"] = [h.display for h in left_history]
+        if left_history and not self.left_history_combo.get():
+            self.left_history_combo.set(left_history[0].display)
+            
+        # 更新右侧历史记录列表
+        self.right_history_combo["values"] = [h.display for h in right_history]
+        if right_history and not self.right_history_combo.get():
+            self.right_history_combo.set(right_history[0].display)
+            
+    def _on_history_select(self, side: str):
+        combo = self.left_history_combo if side == "left" else self.right_history_combo
+        display = combo.get()
+        if not display:
+            return
+            
+        # 获取历史记录
+        history_list = self.connection_manager.get_history(side)
+        for history in history_list:
+            if history.display == display:
+                if history.type == "file":
+                    # 解析SQL文件
+                    if side == "left":
+                        self.left_tables = self.sql_parser.parse_file(history.value)
+                    else:
+                        self.right_tables = self.sql_parser.parse_file(history.value)
+                else:
+                    # TODO: 从数据库获取表结构
+                    pass
+                    
+                # 更新最后使用时间
+                self.connection_manager.update_history_last_used(history.id)
+                break
+                
+        # 显示差异
+        self.show_differences()
 
 if __name__ == "__main__":
     root = tk.Tk()

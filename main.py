@@ -282,15 +282,55 @@ class SQLCompareApp:
             self.show_differences()
 
     def start_compare(self):
-        if not hasattr(self, 'left_file_path') or not hasattr(self, 'right_file_path'):
-            messagebox.showerror("错误", "请先选择两个SQL文件")
+        # 获取左右两侧的历史记录选择
+        left_display = self.left_history_combo.get()
+        right_display = self.right_history_combo.get()
+        
+        if not left_display or not right_display:
+            messagebox.showerror("错误", "请先选择两个数据源")
             return
             
         def compare_thread():
             try:
-                # 解析SQL文件
-                self.left_tables = self.sql_parser.parse_file(self.left_file_path)
-                self.right_tables = self.sql_parser.parse_file(self.right_file_path)
+                # 获取左侧历史记录
+                left_history = None
+                for history in self.connection_manager.get_history("left"):
+                    if history.display == left_display:
+                        left_history = history
+                        break
+                        
+                # 获取右侧历史记录
+                right_history = None
+                for history in self.connection_manager.get_history("right"):
+                    if history.display == right_display:
+                        right_history = history
+                        break
+                
+                if not left_history or not right_history:
+                    messagebox.showerror("错误", "无法找到选中的数据源")
+                    return
+                
+                # 处理左侧数据源
+                if left_history.type == "file":
+                    self.left_tables = self.sql_parser.parse_file(left_history.value)
+                elif left_history.type == "connection":
+                    conn = self.connection_manager.get_connection(left_history.value)
+                    if conn.type == "agent":
+                        messagebox.showerror("错误", "暂不支持Agent类型的连接")
+                        return
+                    # TODO: 从数据库获取表结构
+                    # self.left_tables = self.sql_parser.parse_database(conn)
+                
+                # 处理右侧数据源
+                if right_history.type == "file":
+                    self.right_tables = self.sql_parser.parse_file(right_history.value)
+                elif right_history.type == "connection":
+                    conn = self.connection_manager.get_connection(right_history.value)
+                    if conn.type == "agent":
+                        messagebox.showerror("错误", "暂不支持Agent类型的连接")
+                        return
+                    # TODO: 从数据库获取表结构
+                    # self.right_tables = self.sql_parser.parse_database(conn)
                 
                 # 比较并显示差异
                 self.show_differences()

@@ -1,8 +1,10 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 from typing import Optional, Callable
 from models import Connection, ConnectionManager
 from datetime import datetime
+import mysql.connector
+import requests
 
 class ConnectionDialog(tk.Toplevel):
     def __init__(self, parent, connection_manager: ConnectionManager, on_connection_selected: Optional[Callable[[Connection], None]] = None):
@@ -51,9 +53,9 @@ class ConnectionDialog(tk.Toplevel):
         self.type_var = tk.StringVar(value="mysql")
         type_frame = ttk.Frame(detail_frame)
         type_frame.grid(row=1, column=1, sticky=tk.EW, pady=2)
-        ttk.Radiobutton(type_frame, text="MySQL", variable=self.type_var, value="mysql", 
+        ttk.Radiobutton(type_frame, text="直连MySQL", variable=self.type_var, value="mysql", 
                        command=self._on_type_change).pack(side=tk.LEFT)
-        ttk.Radiobutton(type_frame, text="Agent", variable=self.type_var, value="agent",
+        ttk.Radiobutton(type_frame, text="Agent转发", variable=self.type_var, value="agent",
                        command=self._on_type_change).pack(side=tk.LEFT)
 
         # MySQL配置框架
@@ -80,6 +82,13 @@ class ConnectionDialog(tk.Toplevel):
         self.database_entry = ttk.Entry(self.mysql_frame)
         self.database_entry.grid(row=4, column=1, sticky=tk.EW, pady=2)
 
+        # 按钮框架
+        btn_frame = ttk.Frame(detail_frame)
+        btn_frame.grid(row=6, column=0, columnspan=2, pady=10)
+        
+        ttk.Button(btn_frame, text="测试连接", command=self._test_connection).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="保存", command=self._on_save).pack(side=tk.LEFT, padx=5)
+
         # Agent配置框架
         self.agent_frame = ttk.LabelFrame(detail_frame, text="Agent配置", padding="5")
         self.agent_frame.grid(row=3, column=0, columnspan=2, sticky=tk.EW, pady=5)
@@ -91,9 +100,6 @@ class ConnectionDialog(tk.Toplevel):
         ttk.Label(self.agent_frame, text="Token:").grid(row=1, column=0, sticky=tk.W, pady=2)
         self.token_entry = ttk.Entry(self.agent_frame, show="*")
         self.token_entry.grid(row=1, column=1, sticky=tk.EW, pady=2)
-
-        # 保存按钮
-        ttk.Button(detail_frame, text="保存", command=self._on_save).grid(row=4, column=0, columnspan=2, pady=10)
 
         # 初始显示MySQL配置
         self._on_type_change()
@@ -266,6 +272,59 @@ class ConnectionDialog(tk.Toplevel):
         if self.on_connection_selected:
             self.on_connection_selected(self.selected_connection)
         self.destroy()
+
+    def _test_connection(self):
+        """测试数据库连接"""
+        conn_type = self.type_var.get()
+        
+        if conn_type == "mysql":
+            self._test_mysql_connection()
+        else:
+            self._test_agent_connection()
+
+    def _test_mysql_connection(self):
+        """测试MySQL连接"""
+        try:
+            config = {
+                "host": self.host_entry.get().strip(),
+                "port": int(self.port_entry.get().strip() or "3306"),
+                "user": self.username_entry.get().strip(),
+                "password": self.password_entry.get(),
+                "database": self.database_entry.get().strip()
+            }
+            
+            # 尝试建立连接
+            conn = mysql.connector.connect(**config)
+            conn.close()
+            
+            messagebox.showinfo("成功", "MySQL数据库连接测试成功！", parent=self)
+        except Exception as e:
+            messagebox.showerror("错误", f"MySQL数据库连接测试失败：{str(e)}", parent=self)
+
+    def _test_agent_connection(self):
+        """测试Agent连接"""
+        try:
+            url = self.url_entry.get().strip()
+            token = self.token_entry.get().strip()
+            
+            if not url or not token:
+                messagebox.showerror("错误", "请填写完整的Agent URL和Token", parent=self)
+                return
+                
+            headers = {
+                "Authorization": f"Bearer {token}"
+            }
+            
+            # 发送GET请求测试连接
+            response = requests.get(url, headers=headers, timeout=5)
+            
+            if response.status_code == 200:
+                messagebox.showinfo("成功", "Agent连接测试成功！", parent=self)
+            else:
+                messagebox.showerror("错误", f"Agent连接测试失败：HTTP状态码 {response.status_code}", parent=self)
+                
+        except requests.exceptions.RequestException as e:
+            messagebox.showerror("错误", f"Agent连接测试失败：{str(e)}", parent=self)
 
 class SelectConnectionDialog(tk.Toplevel):
     def __init__(self, parent, connection_manager: ConnectionManager, on_connection_selected: Optional[Callable[[Connection], None]] = None):

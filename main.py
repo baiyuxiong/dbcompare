@@ -3,7 +3,7 @@ from tkinter import ttk, filedialog, scrolledtext, messagebox
 import threading
 from sql_parser import SQLParser
 from sql_generator import SQLGenerator
-from connection_dialog import ConnectionDialog
+from connection_dialog import ConnectionDialog, SelectConnectionDialog
 from models import ConnectionManager, Connection, History
 from datetime import datetime
 
@@ -491,8 +491,12 @@ class SQLCompareApp:
             messagebox.showerror("错误", f"生成同步SQL时出错: {str(e)}")
 
     def _show_connection_dialog(self, side: str = None):
-        dialog = ConnectionDialog(self.root, self.connection_manager, lambda conn: self._on_connection_selected(side, conn))
-        dialog.grab_set()
+        if side is None:
+            dialog = ConnectionDialog(self.root, self.connection_manager)
+            dialog.grab_set()
+        else:
+            dialog = SelectConnectionDialog(self.root, self.connection_manager, lambda conn: self._on_connection_selected(side, conn))
+            dialog.grab_set()
         
     def _on_connection_selected(self, side: str, connection: Connection):
         # 生成显示文本

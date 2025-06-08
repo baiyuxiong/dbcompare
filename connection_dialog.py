@@ -37,7 +37,6 @@ class ConnectionDialog(tk.Toplevel):
         
         ttk.Button(btn_frame, text="新建", command=self._on_new).pack(side=tk.LEFT, padx=2)
         ttk.Button(btn_frame, text="删除", command=self._on_delete).pack(side=tk.LEFT, padx=2)
-        ttk.Button(btn_frame, text="选择", command=self._on_select).pack(side=tk.LEFT, padx=2)
 
         # 连接详情框架
         detail_frame = ttk.LabelFrame(main_frame, text="连接详情", padding="5")
@@ -256,6 +255,70 @@ class ConnectionDialog(tk.Toplevel):
             self.connection_manager.add_connection(connection)
         
         self._load_connections()
+
+    def _on_double_click(self, event):
+        self._on_select()
+
+    def _on_select(self):
+        if not self.selected_connection:
+            return
+            
+        if self.on_connection_selected:
+            self.on_connection_selected(self.selected_connection)
+        self.destroy()
+
+class SelectConnectionDialog(tk.Toplevel):
+    def __init__(self, parent, connection_manager: ConnectionManager, on_connection_selected: Optional[Callable[[Connection], None]] = None):
+        super().__init__(parent)
+        self.title("选择连接")
+        self.connection_manager = connection_manager
+        self.on_connection_selected = on_connection_selected
+        self.selected_connection: Optional[Connection] = None
+        
+        self._init_ui()
+        self._load_connections()
+
+    def _init_ui(self):
+        # 创建主框架
+        main_frame = ttk.Frame(self, padding="10")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        # 连接列表
+        list_frame = ttk.LabelFrame(main_frame, text="连接列表", padding="5")
+        list_frame.pack(fill=tk.BOTH, expand=True)
+
+        self.connection_list = ttk.Treeview(list_frame, columns=("name", "type"), show="headings")
+        self.connection_list.heading("name", text="名称")
+        self.connection_list.heading("type", text="类型")
+        self.connection_list.pack(fill=tk.BOTH, expand=True)
+        self.connection_list.bind("<<TreeviewSelect>>", self._on_select_connection)
+        self.connection_list.bind("<Double-1>", self._on_double_click)
+
+        # 按钮框架
+        btn_frame = ttk.Frame(list_frame)
+        btn_frame.pack(fill=tk.X, pady=5)
+        
+        ttk.Button(btn_frame, text="选择", command=self._on_select).pack(side=tk.LEFT, padx=2)
+        ttk.Button(btn_frame, text="取消", command=self.destroy).pack(side=tk.LEFT, padx=2)
+
+    def _load_connections(self):
+        # 清空列表
+        for item in self.connection_list.get_children():
+            self.connection_list.delete(item)
+        
+        # 加载连接
+        connections = self.connection_manager.get_all_connections()
+        for conn in connections:
+            self.connection_list.insert("", "end", values=(conn.name, conn.type), tags=(str(conn.id),))
+
+    def _on_select_connection(self, event):
+        selection = self.connection_list.selection()
+        if not selection:
+            return
+        
+        item = selection[0]
+        conn_id = int(self.connection_list.item(item)["tags"][0])
+        self.selected_connection = self.connection_manager.get_connection(conn_id)
 
     def _on_double_click(self, event):
         self._on_select()

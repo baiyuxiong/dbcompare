@@ -87,7 +87,10 @@ class ConnectionManager:
     def delete_connection(self, connection_id: int):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
+            # 删除连接
             cursor.execute("DELETE FROM connections WHERE id = ?", (connection_id,))
+            # 删除相关的历史记录
+            cursor.execute("DELETE FROM history WHERE type = 'connection' AND value = ?", (str(connection_id),))
             conn.commit()
 
     def get_connection(self, connection_id: int) -> Optional[Connection]:

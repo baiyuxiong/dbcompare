@@ -157,6 +157,9 @@ class ConnectionDialog(tk.Toplevel):
             self._load_connections()
             self.selected_connection = None
             self._clear_ui()
+            # 通知主窗口刷新历史记录
+            if hasattr(self.master, '_update_history_lists'):
+                self.master._update_history_lists()
             confirm_dialog.destroy()
             
         def on_cancel():

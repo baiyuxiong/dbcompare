@@ -1,5 +1,6 @@
 import mysql.connector
 from typing import Dict, Any
+from util import normalize_sql_definition
 
 class DBConnector:
     def __init__(self):
@@ -45,12 +46,23 @@ class DBConnector:
                     col_null = 'NULL' if col['Null'] == 'YES' else 'NOT NULL'
                     col_default = f"DEFAULT {col['Default']}" if col['Default'] is not None else ''
                     col_extra = col['Extra']
+                    col_comment = f"COMMENT '{col['Comment']}'" if col['Comment'] else ''
                     
-                    # 组合列定义
-                    col_def = f"{col_type} {col_null} {col_default} {col_extra}".strip()
+                    # 组合列定义 
+                    # {'Field': 'team_id', 'Type': 'char(32)', 'Collation': 'utf8mb4_0900_ai_ci', 'Null': 'NO', 'Key': '', 'Default': '', 'Extra': '', 'Privileges': 'select,insert,update,references', 'Comment': '组织ID'}
+                    col_def = f"{col_type} {col_null} {col_default} {col_extra} {col_comment}".strip()
                     columns[col_name] = {
                         'raw': col_def,
-                        'normalized': col_def.upper()
+                        'normalized': normalize_sql_definition(col_def),
+                        'details': {
+                            "Type": col['Type'],
+                            "Collation": col['Collation'],
+                            "Null": col['Null'],
+                            "Key": col['Key'],
+                            "Default": col['Default'],
+                            "Extra": col['Extra'],
+                            "Comment": col['Comment'],
+                        }
                     }
                 
                 # 获取索引信息

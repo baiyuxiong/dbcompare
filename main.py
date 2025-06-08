@@ -6,6 +6,7 @@ from sql_generator import SQLGenerator
 from connection_dialog import ConnectionDialog, SelectConnectionDialog
 from models import ConnectionManager, Connection, History
 from datetime import datetime
+from db_connector import DBConnector
 
 class SQLCompareApp:
     def __init__(self, root):
@@ -23,6 +24,7 @@ class SQLCompareApp:
         # 初始化SQL解析器
         self.sql_parser = SQLParser()
         self.sql_generator = SQLGenerator()
+        self.db_connector = DBConnector()
         
         # 创建菜单栏
         self.create_menu()
@@ -278,8 +280,8 @@ class SQLCompareApp:
             else:
                 self.right_tables = self.sql_parser.parse_file(file_path)
                 
-            # 显示差异
-            self.show_differences()
+            # 显示表结构
+            self.show_tables(side)
 
     def start_compare(self):
         # 获取左右两侧的历史记录选择
@@ -318,8 +320,6 @@ class SQLCompareApp:
                     if conn.type == "agent":
                         messagebox.showerror("错误", "暂不支持Agent类型的连接")
                         return
-                    # TODO: 从数据库获取表结构
-                    # self.left_tables = self.sql_parser.parse_database(conn)
                 
                 # 处理右侧数据源
                 if right_history.type == "file":
@@ -329,8 +329,6 @@ class SQLCompareApp:
                     if conn.type == "agent":
                         messagebox.showerror("错误", "暂不支持Agent类型的连接")
                         return
-                    # TODO: 从数据库获取表结构
-                    # self.right_tables = self.sql_parser.parse_database(conn)
                 
                 # 比较并显示差异
                 self.show_differences()
@@ -551,7 +549,7 @@ class SQLCompareApp:
             id=None,
             side=side,
             type="connection",
-            value=connection.name,
+            value=connection.id,
             display=display,
             last_used=datetime.now()
         )
@@ -566,8 +564,30 @@ class SQLCompareApp:
         else:
             self.right_history_combo.set(display)
             
-        # TODO: 从数据库获取表结构
-        # 这里需要实现从数据库获取表结构的功能
+        # 从数据库获取表结构
+        if connection.type == "mysql":
+            try:
+                # 连接到数据库
+                db_config = connection.config.copy()
+                db_config['user'] = db_config.pop('username')
+                self.db_connector.connect(db_config)
+                # 获取表结构
+                tables = self.db_connector.get_table_structure()
+                # 关闭连接
+                self.db_connector.close()
+                
+                # 更新表结构
+                if side == "left":
+                    self.left_tables = tables
+                else:
+                    self.right_tables = tables
+                    
+                # 显示表结构
+                self.show_tables(side)
+            except Exception as e:
+                messagebox.showerror("错误", f"获取表结构失败: {str(e)}")
+        elif connection.type == "agent":
+            messagebox.showinfo("提示", "暂不支持Agent类型的连接")
         
     def _update_history_lists(self):
         # 获取历史记录
@@ -576,14 +596,10 @@ class SQLCompareApp:
         
         # 更新左侧历史记录列表
         self.left_history_combo["values"] = [h.display for h in left_history]
-        if left_history and not self.left_history_combo.get():
-            self.left_history_combo.set(left_history[0].display)
             
         # 更新右侧历史记录列表
         self.right_history_combo["values"] = [h.display for h in right_history]
-        if right_history and not self.right_history_combo.get():
-            self.right_history_combo.set(right_history[0].display)
-            
+
     def _on_history_select(self, side: str):
         combo = self.left_history_combo if side == "left" else self.right_history_combo
         display = combo.get()
@@ -600,16 +616,91 @@ class SQLCompareApp:
                         self.left_tables = self.sql_parser.parse_file(history.value)
                     else:
                         self.right_tables = self.sql_parser.parse_file(history.value)
-                else:
-                    # TODO: 从数据库获取表结构
-                    pass
+                    # 显示表结构
+                    self.show_tables(side)
+                elif history.type == "connection":
+                    # 获取连接信息
+                    conn = self.connection_manager.get_connection(history.value)
+                    if conn.type == "mysql":
+                        try:
+                            # 连接到数据库
+                            db_config = conn.config.copy()
+                            db_config['user'] = db_config.pop('username')
+                            self.db_connector.connect(db_config)
+                            # 获取表结构
+                            tables = self.db_connector.get_table_structure()
+                            # 关闭连接
+                            self.db_connector.close()
+                            
+                            # 更新表结构
+                            if side == "left":
+                                self.left_tables = tables
+                            else:
+                                self.right_tables = tables
+                                
+                            # 显示表结构
+                            self.show_tables(side)
+                        except Exception as e:
+                            messagebox.showerror("错误", f"获取表结构失败: {str(e)}")
+                    elif conn.type == "agent":
+                        messagebox.showinfo("提示", "暂不支持Agent类型的连接")
                     
                 # 更新最后使用时间
                 self.connection_manager.update_history_last_used(history.id)
                 break
                 
         # 显示差异
-        self.show_differences()
+        self.show_tables(side)
+
+    def show_tables(self, side: str):
+        """显示表结构"""
+        # 清空显示区域
+        tree = self.left_tree if side == "left" else self.right_tree
+        tree.delete(*tree.get_children())
+        
+        # 获取表数据
+        tables = self.left_tables if side == "left" else self.right_tables
+        
+        # 获取所有表名
+        all_tables = sorted(tables.keys())
+        
+        # 为每个表创建数据
+        for table_index, table_name in enumerate(all_tables, 1):
+            # 获取表的字段
+            columns = tables[table_name].get('columns', {})
+            indexes = tables[table_name].get('indexes', {})
+            
+            # 计算字段数量和索引数量
+            column_count = len(columns)
+            index_count = len(indexes)
+            
+            # 添加表头
+            tree.insert("", "end", values=(f"表{table_index}", f"表名: {table_name}", f"字段数: {column_count} 索引数: {index_count}"), tags=("table_header",))
+            
+            # 添加字段信息
+            if columns:
+                # 添加字段标题行
+                tree.insert("", "end", values=("", "字段", ""), tags=("header",))
+                
+                # 添加字段行
+                for col_index, (col_name, col_def) in enumerate(sorted(columns.items()), 1):
+                    col_def_display = col_def.get('raw', '') if isinstance(col_def, dict) else col_def
+                    tree.insert("", "end", values=(col_index, col_name, col_def_display))
+            
+            # 添加索引信息
+            if indexes:
+                # 添加索引标题行
+                tree.insert("", "end", values=("", "索引", ""), tags=("header",))
+                
+                # 添加索引行
+                for idx_index, (idx_name, idx_def) in enumerate(sorted(indexes.items()), 1):
+                    idx_type = idx_def.get('type', '')
+                    idx_columns = idx_def.get('columns', '')
+                    idx_def_display = f"{idx_type} ({idx_columns})"
+                    tree.insert("", "end", values=(idx_index, idx_name, idx_def_display))
+            
+            # 添加空行
+            tree.insert("", "end", values=("", "", ""))
 
 if __name__ == "__main__":
     root = tk.Tk()

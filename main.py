@@ -32,6 +32,9 @@ class SQLCompareApp:
         # 初始化连接管理器
         self.connection_manager = ConnectionManager()
         
+        # 更新历史记录显示格式（添加数据库名称）
+        self.connection_manager.update_history_display_format()
+        
         # 创建主内容区
         self.create_main_content()
 
@@ -513,20 +516,82 @@ class SQLCompareApp:
             messagebox.showerror("错误", "请先执行比较操作")
             return
             
-        try:
-            sync_sql = self.sql_generator.generate_sync_sql(self.left_tables, self.right_tables)
+        # 创建目标库选择对话框
+        target_dialog = tk.Toplevel(self.root)
+        target_dialog.title("选择目标库")
+        target_dialog.geometry("400x200")
+        target_dialog.transient(self.root)
+        target_dialog.grab_set()
+        
+        # 居中显示
+        target_dialog.geometry("+%d+%d" % (
+            self.root.winfo_rootx() + 100,
+            self.root.winfo_rooty() + 100))
+        
+        # 获取左右数据库的名称
+        left_name = "左侧数据库"
+        right_name = "右侧数据库"
+        
+        # 尝试从历史记录中获取数据库名称
+        left_history = self.connection_manager.get_history("left")
+        right_history = self.connection_manager.get_history("right")
+        
+        if left_history:
+            left_name = left_history[0].display
+        if right_history:
+            right_name = right_history[0].display
             
-            # 创建新窗口显示SQL
-            sql_window = tk.Toplevel(self.root)
-            sql_window.title("同步SQL")
-            sql_window.geometry("800x600")
+        # 创建选择框架
+        main_frame = ttk.Frame(target_dialog, padding="20")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        ttk.Label(main_frame, text="请选择目标数据库：", font=("", 12, "bold")).pack(pady=(0, 20))
+        
+        target_var = tk.StringVar(value="right")
+        
+        ttk.Radiobutton(main_frame, text=f"以 {right_name} 为目标库（将左侧结构同步到右侧）", 
+                       variable=target_var, value="right").pack(anchor=tk.W, pady=5)
+        ttk.Radiobutton(main_frame, text=f"以 {left_name} 为目标库（将右侧结构同步到左侧）", 
+                       variable=target_var, value="left").pack(anchor=tk.W, pady=5)
+        
+        # 按钮框架
+        btn_frame = ttk.Frame(main_frame)
+        btn_frame.pack(pady=20)
+        
+        def on_confirm():
+            target_side = target_var.get()
+            target_dialog.destroy()
             
-            sql_text = scrolledtext.ScrolledText(sql_window, wrap=tk.WORD)
-            sql_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-            sql_text.insert(tk.END, sync_sql)
-            
-        except Exception as e:
-            messagebox.showerror("错误", f"生成同步SQL时出错: {str(e)}")
+            try:
+                if target_side == "right":
+                    # 以右侧为目标库，将左侧结构同步到右侧
+                    sync_sql = self.sql_generator.generate_sync_sql(self.left_tables, self.right_tables)
+                    title = f"同步SQL - 将 {left_name} 同步到 {right_name}"
+                else:
+                    # 以左侧为目标库，将右侧结构同步到左侧
+                    sync_sql = self.sql_generator.generate_sync_sql(self.right_tables, self.left_tables)
+                    title = f"同步SQL - 将 {right_name} 同步到 {left_name}"
+                
+                # 创建新窗口显示SQL
+                sql_window = tk.Toplevel(self.root)
+                sql_window.title(title)
+                sql_window.geometry("800x600")
+                
+                sql_text = scrolledtext.ScrolledText(sql_window, wrap=tk.WORD)
+                sql_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+                sql_text.insert(tk.END, sync_sql)
+                
+            except Exception as e:
+                messagebox.showerror("错误", f"生成同步SQL时出错: {str(e)}")
+        
+        def on_cancel():
+            target_dialog.destroy()
+        
+        ttk.Button(btn_frame, text="确定", command=on_confirm).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="取消", command=on_cancel).pack(side=tk.LEFT, padx=5)
+        
+        # 等待对话框关闭
+        self.root.wait_window(target_dialog)
 
     def _show_connection_dialog(self, side: str = None):
         if side is None:
@@ -540,7 +605,11 @@ class SQLCompareApp:
         # 生成显示文本
         if connection.type == "mysql":
             config = connection.config
-            display = f"{connection.name} ({config['host']}:{config['port']})"
+            database_name = config.get('database', '')
+            if database_name:
+                display = f"{connection.name} ({config['host']}:{config['port']}/{database_name})"
+            else:
+                display = f"{connection.name} ({config['host']}:{config['port']})"
         else:
             display = f"{connection.name} ({connection.config['url']})"
             

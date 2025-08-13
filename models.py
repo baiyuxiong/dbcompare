@@ -170,4 +170,33 @@ class ConnectionManager:
                 SET last_used = ? 
                 WHERE id = ?
             """, (datetime.now().isoformat(), history_id))
+            conn.commit()
+            
+    def update_history_display_format(self):
+        """更新历史记录的显示格式，添加数据库名称"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            # 获取所有连接类型的历史记录
+            cursor.execute("SELECT h.id, h.value, c.config FROM history h JOIN connections c ON h.value = c.id WHERE h.type = 'connection'")
+            rows = cursor.fetchall()
+            
+            for row in rows:
+                history_id, connection_id, config_json = row
+                try:
+                    config = json.loads(config_json)
+                    # 获取连接信息
+                    conn_obj = self.get_connection(connection_id)
+                    if conn_obj and conn_obj.type == "mysql":
+                        database_name = config.get('database', '')
+                        if database_name:
+                            new_display = f"{conn_obj.name} ({config['host']}:{config['port']}/{database_name})"
+                        else:
+                            new_display = f"{conn_obj.name} ({config['host']}:{config['port']})"
+                        
+                        # 更新显示文本
+                        cursor.execute("UPDATE history SET display = ? WHERE id = ?", (new_display, history_id))
+                except Exception:
+                    # 如果解析失败，跳过这条记录
+                    continue
+            
             conn.commit() 

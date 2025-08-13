@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 from typing import Optional, Callable
-from models import Connection, ConnectionManager
+from ..data.models import Connection, ConnectionManager
 from datetime import datetime
 import mysql.connector
 

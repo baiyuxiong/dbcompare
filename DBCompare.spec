@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['main.py'],
+    ['/Users/baiyuxiong/code/dbcompare/app.py'],
     pathex=[],
     binaries=[],
     datas=[('connections.db', '.')],

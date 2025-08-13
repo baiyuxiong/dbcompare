@@ -1,4 +1,4 @@
-from sql_parser import SQLParser
+from .sql_parser import SQLParser
 
 class SQLGenerator:
     def __init__(self):

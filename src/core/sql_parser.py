@@ -1,7 +1,7 @@
 import sqlparse
 from sqlparse.sql import Identifier, IdentifierList, Parenthesis
 from sqlparse.tokens import Keyword, DML, Whitespace
-from util import normalize_sql_definition
+from ..utils.util import normalize_sql_definition
 class SQLParser:
     def __init__(self):
         pass

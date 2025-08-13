@@ -1,6 +1,6 @@
 import mysql.connector
 from typing import Dict, Any
-from util import normalize_sql_definition
+from ..utils.util import normalize_sql_definition
 
 class DBConnector:
     def __init__(self):

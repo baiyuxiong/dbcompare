@@ -1,12 +1,12 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, scrolledtext, messagebox
 import threading
-from sql_parser import SQLParser
-from sql_generator import SQLGenerator
-from connection_dialog import ConnectionDialog, SelectConnectionDialog
-from models import ConnectionManager, Connection, History
+from .core.sql_parser import SQLParser
+from .core.sql_generator import SQLGenerator
+from .ui.connection_dialog import ConnectionDialog, SelectConnectionDialog
+from .data.models import ConnectionManager, Connection, History
 from datetime import datetime
-from db_connector import DBConnector
+from .core.db_connector import DBConnector
 
 class SQLCompareApp:
     def __init__(self, root):
@@ -16,31 +16,25 @@ class SQLCompareApp:
         
         # 初始化变量
         self.sync_scroll = tk.BooleanVar(value=True)
-        self.hide_same = tk.BooleanVar(value=False)  # 添加隐藏相同行变量
-        self.show_missing_only = tk.BooleanVar(value=False)  # 添加仅显示缺失变量
+        self.hide_same = tk.BooleanVar(value=False)
+        self.show_missing_only = tk.BooleanVar(value=False)
         self.left_tables = {}
         self.right_tables = {}
         
-        # 初始化SQL解析器
+        # 初始化组件
         self.sql_parser = SQLParser()
         self.sql_generator = SQLGenerator()
         self.db_connector = DBConnector()
-        
-        # 创建菜单栏
-        self.create_menu()
-        
-        # 初始化连接管理器
         self.connection_manager = ConnectionManager()
         
-        # 更新历史记录显示格式（添加数据库名称）
+        # 创建界面
+        self.create_menu()
         self.connection_manager.update_history_display_format()
-        
-        # 创建主内容区
         self.create_main_content()
-
         self.toggle_sync_scroll()
         
     def create_menu(self):
+        """创建菜单栏"""
         menu_frame = ttk.Frame(self.root)
         menu_frame.pack(fill=tk.X, padx=5, pady=5)
         
@@ -68,7 +62,7 @@ class SQLCompareApp:
             menu_frame,
             text="隐藏相同行",
             variable=self.hide_same,
-            command=self.show_differences  # 当切换时重新显示差异
+            command=self.show_differences
         )
         hide_same_check.pack(side=tk.LEFT, padx=5)
         
@@ -77,7 +71,7 @@ class SQLCompareApp:
             menu_frame,
             text="仅显示缺失",
             variable=self.show_missing_only,
-            command=self.show_differences  # 当切换时重新显示差异
+            command=self.show_differences
         )
         show_missing_check.pack(side=tk.LEFT, padx=5)
         
@@ -770,8 +764,3 @@ class SQLCompareApp:
             
             # 添加空行
             tree.insert("", "end", values=("", "", ""))
-
-if __name__ == "__main__":
-    root = tk.Tk()
-    app = SQLCompareApp(root)
-    root.mainloop() 

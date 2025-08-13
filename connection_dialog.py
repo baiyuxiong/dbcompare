@@ -26,9 +26,9 @@ class ConnectionDialog(tk.Toplevel):
         list_frame = ttk.LabelFrame(main_frame, text="连接列表", padding="5")
         list_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
 
-        self.connection_list = ttk.Treeview(list_frame, columns=("name", "type"), show="headings")
+        self.connection_list = ttk.Treeview(list_frame, columns=("name", "database"), show="headings")
         self.connection_list.heading("name", text="名称")
-        self.connection_list.heading("type", text="类型")
+        self.connection_list.heading("database", text="数据库名称")
         self.connection_list.pack(fill=tk.BOTH, expand=True)
         self.connection_list.bind("<<TreeviewSelect>>", self._on_select_connection)
         self.connection_list.bind("<Double-1>", self._on_double_click)
@@ -49,18 +49,9 @@ class ConnectionDialog(tk.Toplevel):
         self.name_entry = ttk.Entry(detail_frame)
         self.name_entry.grid(row=0, column=1, sticky=tk.EW, pady=2)
 
-        ttk.Label(detail_frame, text="类型:").grid(row=1, column=0, sticky=tk.W, pady=2)
-        self.type_var = tk.StringVar(value="mysql")
-        type_frame = ttk.Frame(detail_frame)
-        type_frame.grid(row=1, column=1, sticky=tk.EW, pady=2)
-        ttk.Radiobutton(type_frame, text="直连MySQL", variable=self.type_var, value="mysql", 
-                       command=self._on_type_change).pack(side=tk.LEFT)
-        ttk.Radiobutton(type_frame, text="Agent转发", variable=self.type_var, value="agent",
-                       command=self._on_type_change).pack(side=tk.LEFT)
-
         # MySQL配置框架
         self.mysql_frame = ttk.LabelFrame(detail_frame, text="MySQL配置", padding="5")
-        self.mysql_frame.grid(row=2, column=0, columnspan=2, sticky=tk.EW, pady=5)
+        self.mysql_frame.grid(row=1, column=0, columnspan=2, sticky=tk.EW, pady=5)
 
         ttk.Label(self.mysql_frame, text="主机:").grid(row=0, column=0, sticky=tk.W, pady=2)
         self.host_entry = ttk.Entry(self.mysql_frame)
@@ -84,25 +75,10 @@ class ConnectionDialog(tk.Toplevel):
 
         # 按钮框架
         btn_frame = ttk.Frame(detail_frame)
-        btn_frame.grid(row=6, column=0, columnspan=2, pady=10)
+        btn_frame.grid(row=5, column=0, columnspan=2, pady=10)
         
         ttk.Button(btn_frame, text="测试连接", command=self._test_connection).pack(side=tk.LEFT, padx=5)
         ttk.Button(btn_frame, text="保存", command=self._on_save).pack(side=tk.LEFT, padx=5)
-
-        # Agent配置框架
-        self.agent_frame = ttk.LabelFrame(detail_frame, text="Agent配置", padding="5")
-        self.agent_frame.grid(row=3, column=0, columnspan=2, sticky=tk.EW, pady=5)
-
-        ttk.Label(self.agent_frame, text="URL:").grid(row=0, column=0, sticky=tk.W, pady=2)
-        self.url_entry = ttk.Entry(self.agent_frame)
-        self.url_entry.grid(row=0, column=1, sticky=tk.EW, pady=2)
-
-        ttk.Label(self.agent_frame, text="Token:").grid(row=1, column=0, sticky=tk.W, pady=2)
-        self.token_entry = ttk.Entry(self.agent_frame, show="*")
-        self.token_entry.grid(row=1, column=1, sticky=tk.EW, pady=2)
-
-        # 初始显示MySQL配置
-        self._on_type_change()
 
     def _load_connections(self):
         # 清空列表
@@ -112,7 +88,10 @@ class ConnectionDialog(tk.Toplevel):
         # 加载连接
         connections = self.connection_manager.get_all_connections()
         for conn in connections:
-            self.connection_list.insert("", "end", values=(conn.name, conn.type), tags=(str(conn.id),))
+            database_name = ""
+            if conn.type == "mysql" and "database" in conn.config:
+                database_name = conn.config["database"]
+            self.connection_list.insert("", "end", values=(conn.name, database_name), tags=(str(conn.id),))
 
     def _on_select_connection(self, event):
         selection = self.connection_list.selection()
@@ -127,8 +106,6 @@ class ConnectionDialog(tk.Toplevel):
     def _on_new(self):
         self.selected_connection = None
         self._clear_ui()
-        self.type_var.set("mysql")
-        self._on_type_change()
 
     def _on_delete(self):
         if not self.selected_connection:
@@ -171,23 +148,12 @@ class ConnectionDialog(tk.Toplevel):
         # 等待对话框关闭
         self.wait_window(confirm_dialog)
 
-    def _on_type_change(self):
-        if self.type_var.get() == "mysql":
-            self.mysql_frame.grid()
-            self.agent_frame.grid_remove()
-        else:
-            self.mysql_frame.grid_remove()
-            self.agent_frame.grid()
-
     def _update_ui(self):
         if not self.selected_connection:
             return
         
         self.name_entry.delete(0, tk.END)
         self.name_entry.insert(0, self.selected_connection.name)
-        
-        self.type_var.set(self.selected_connection.type)
-        self._on_type_change()
         
         config = self.selected_connection.config
         if self.selected_connection.type == "mysql":
@@ -205,12 +171,6 @@ class ConnectionDialog(tk.Toplevel):
             
             self.database_entry.delete(0, tk.END)
             self.database_entry.insert(0, config.get("database", ""))
-        else:
-            self.url_entry.delete(0, tk.END)
-            self.url_entry.insert(0, config.get("url", ""))
-            
-            self.token_entry.delete(0, tk.END)
-            self.token_entry.insert(0, config.get("token", ""))
 
     def _clear_ui(self):
         self.name_entry.delete(0, tk.END)
@@ -219,8 +179,6 @@ class ConnectionDialog(tk.Toplevel):
         self.username_entry.delete(0, tk.END)
         self.password_entry.delete(0, tk.END)
         self.database_entry.delete(0, tk.END)
-        self.url_entry.delete(0, tk.END)
-        self.token_entry.delete(0, tk.END)
 
     def _on_save(self):
         name = self.name_entry.get().strip()
@@ -228,22 +186,15 @@ class ConnectionDialog(tk.Toplevel):
             tk.messagebox.showerror("错误", "请输入连接名称")
             return
         
-        conn_type = self.type_var.get()
-        config = {}
-        
-        if conn_type == "mysql":
-            config = {
-                "host": self.host_entry.get().strip(),
-                "port": int(self.port_entry.get().strip() or "3306"),
-                "username": self.username_entry.get().strip(),
-                "password": self.password_entry.get(),
-                "database": self.database_entry.get().strip()
-            }
-        else:
-            config = {
-                "url": self.url_entry.get().strip(),
-                "token": self.token_entry.get()
-            }
+        # 默认使用直连MySQL
+        conn_type = "mysql"
+        config = {
+            "host": self.host_entry.get().strip(),
+            "port": int(self.port_entry.get().strip() or "3306"),
+            "username": self.username_entry.get().strip(),
+            "password": self.password_entry.get(),
+            "database": self.database_entry.get().strip()
+        }
         
         now = datetime.now()
         if self.selected_connection:
@@ -278,12 +229,7 @@ class ConnectionDialog(tk.Toplevel):
 
     def _test_connection(self):
         """测试数据库连接"""
-        conn_type = self.type_var.get()
-        
-        if conn_type == "mysql":
-            self._test_mysql_connection()
-        else:
-            self._test_agent_connection()
+        self._test_mysql_connection()
 
     def _test_mysql_connection(self):
         """测试MySQL连接"""
@@ -303,31 +249,6 @@ class ConnectionDialog(tk.Toplevel):
             messagebox.showinfo("成功", "MySQL数据库连接测试成功！", parent=self)
         except Exception as e:
             messagebox.showerror("错误", f"MySQL数据库连接测试失败：{str(e)}", parent=self)
-
-    def _test_agent_connection(self):
-        """测试Agent连接"""
-        try:
-            url = self.url_entry.get().strip()
-            token = self.token_entry.get().strip()
-            
-            if not url or not token:
-                messagebox.showerror("错误", "请填写完整的Agent URL和Token", parent=self)
-                return
-                
-            headers = {
-                "Authorization": f"Bearer {token}"
-            }
-            
-            # 发送GET请求测试连接
-            response = requests.get(url, headers=headers, timeout=5)
-            
-            if response.status_code == 200:
-                messagebox.showinfo("成功", "Agent连接测试成功！", parent=self)
-            else:
-                messagebox.showerror("错误", f"Agent连接测试失败：HTTP状态码 {response.status_code}", parent=self)
-                
-        except requests.exceptions.RequestException as e:
-            messagebox.showerror("错误", f"Agent连接测试失败：{str(e)}", parent=self)
 
 class SelectConnectionDialog(tk.Toplevel):
     def __init__(self, parent, connection_manager: ConnectionManager, on_connection_selected: Optional[Callable[[Connection], None]] = None):
@@ -349,9 +270,9 @@ class SelectConnectionDialog(tk.Toplevel):
         list_frame = ttk.LabelFrame(main_frame, text="连接列表", padding="5")
         list_frame.pack(fill=tk.BOTH, expand=True)
 
-        self.connection_list = ttk.Treeview(list_frame, columns=("name", "type"), show="headings")
+        self.connection_list = ttk.Treeview(list_frame, columns=("name", "database"), show="headings")
         self.connection_list.heading("name", text="名称")
-        self.connection_list.heading("type", text="类型")
+        self.connection_list.heading("database", text="数据库名称")
         self.connection_list.pack(fill=tk.BOTH, expand=True)
         self.connection_list.bind("<<TreeviewSelect>>", self._on_select_connection)
         self.connection_list.bind("<Double-1>", self._on_double_click)
@@ -371,7 +292,10 @@ class SelectConnectionDialog(tk.Toplevel):
         # 加载连接
         connections = self.connection_manager.get_all_connections()
         for conn in connections:
-            self.connection_list.insert("", "end", values=(conn.name, conn.type), tags=(str(conn.id),))
+            database_name = ""
+            if conn.type == "mysql" and "database" in conn.config:
+                database_name = conn.config["database"]
+            self.connection_list.insert("", "end", values=(conn.name, database_name), tags=(str(conn.id),))
 
     def _on_select_connection(self, event):
         selection = self.connection_list.selection()

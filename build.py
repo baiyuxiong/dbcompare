@@ -56,7 +56,7 @@ def build_app(platform_name):
     # 基础 PyInstaller 命令
     cmd = [
         "pyinstaller",
-        "--onefile",  # 打包成单个文件
+        "--onedir" if platform_name == "mac" else "--onefile",  # macOS 使用 onedir 模式
         "--windowed",  # 不显示控制台窗口 (Windows/Mac)
         "--name=DBCompare",  # 应用名称
         "--icon=icon.ico" if platform_name == "win" else "",  # Windows 图标
@@ -66,8 +66,10 @@ def build_app(platform_name):
         "--hidden-import=tkinter.filedialog",
         "--hidden-import=tkinter.scrolledtext",
         "--hidden-import=tkinter.messagebox",
+        "--hidden-import=_tkinter",
         "--hidden-import=sqlite3",
         "--hidden-import=mysql.connector",
+        "--hidden-import=mysql.connector.plugins.mysql_native_password",
         "--hidden-import=sqlparse",
         "--hidden-import=threading",
         "--hidden-import=datetime",
@@ -83,9 +85,11 @@ def build_app(platform_name):
             "--console",  # Windows 下保留控制台以便调试
         ])
     elif platform_name == "mac":
-        cmd.extend([
-            "--target-architecture=universal2",  # 支持 Intel 和 Apple Silicon
-        ])
+        # 移除 universal2 选项，使用当前架构
+        # cmd.extend([
+        #     "--target-architecture=universal2",  # 支持 Intel 和 Apple Silicon
+        # ])
+        pass
     elif platform_name == "linux":
         cmd.extend([
             "--console",  # Linux 下保留控制台
@@ -122,13 +126,17 @@ def main():
         build_app(platform_name)
         
         print(f"\n✅ 构建完成!")
-        print(f"可执行文件位置: dist/DBCompare{'exe' if platform_name == 'win' else ''}")
         
         if platform_name == "win":
+            print(f"可执行文件位置: dist/DBCompare.exe")
             print("Windows 用户: 运行 dist/DBCompare.exe")
         elif platform_name == "mac":
-            print("macOS 用户: 运行 dist/DBCompare")
+            print(f"可执行文件位置: dist/DBCompare/DBCompare")
+            print("macOS 用户: 运行 ./dist/DBCompare/DBCompare")
+            print("或者双击 dist/DBCompare.app")
+            print("也可以使用: ./run_mac.sh")
         else:
+            print(f"可执行文件位置: dist/DBCompare")
             print("Linux 用户: 运行 ./dist/DBCompare")
             
     except subprocess.CalledProcessError as e:

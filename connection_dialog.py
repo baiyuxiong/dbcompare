@@ -4,7 +4,6 @@ from typing import Optional, Callable
 from models import Connection, ConnectionManager
 from datetime import datetime
 import mysql.connector
-import requests
 
 class ConnectionDialog(tk.Toplevel):
     def __init__(self, parent, connection_manager: ConnectionManager, on_connection_selected: Optional[Callable[[Connection], None]] = None):

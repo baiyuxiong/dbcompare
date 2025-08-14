@@ -121,8 +121,16 @@ class SQLParser:
         
     def parse_file(self, file_path):
         """解析SQL文件，返回表结构字典"""
-        with open(file_path, 'r', encoding='utf-8') as f:
-            content = f.read()
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+        except FileNotFoundError:
+            # 文件不存在时返回空字典
+            return {}
+        except Exception as e:
+            # 其他错误时也返回空字典
+            print(f"读取文件 {file_path} 时出错: {e}")
+            return {}
             
         # 解析SQL语句
         statements = sqlparse.parse(content)

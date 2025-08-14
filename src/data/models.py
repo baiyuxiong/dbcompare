@@ -128,6 +128,15 @@ class ConnectionManager:
     def add_history(self, history: History) -> int:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
+            
+            # 如果当前连接在之前的历史记录中已存在，则删除旧记录
+            # 保证历史记录中，同样的连接只有一个
+            cursor.execute("""
+                DELETE FROM history 
+                WHERE side = ? AND type = ? AND value = ?
+            """, (history.side, history.type, history.value))
+            
+            # 添加新的历史记录
             cursor.execute("""
                 INSERT INTO history (side, type, value, display, last_used)
                 VALUES (?, ?, ?, ?, ?)

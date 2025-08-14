@@ -38,8 +38,10 @@ class SQLGenerator:
             # 修改列
             if 'columns' in changes and 'modified_columns' in changes['columns']:
                 for col_name, col_changes in changes['columns']['modified_columns'].items():
+                    # 获取右侧的列定义
+                    right_def = col_changes['raw']['right']
                     sql_statements.append(
-                        f"ALTER TABLE `{table_name}` MODIFY COLUMN `{col_name}` {col_changes['right']};"
+                        f"ALTER TABLE `{table_name}` MODIFY COLUMN `{col_name}` {right_def};"
                     )
                 
         return "\n".join(sql_statements) 

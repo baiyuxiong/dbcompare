@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
     QGridLayout, QLineEdit
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont, QColor
+from PyQt6.QtGui import QFont, QColor, QClipboard
 
 from core.sql_parser import SQLParser
 from core.sql_generator import SQLGenerator
@@ -313,8 +313,6 @@ class SQLCompareApp(QMainWindow):
                 # 显示表结构
                 self.show_tables(side)
                 
-                QMessageBox.information(self, "成功", f"成功加载文件: {file_path}")
-                
             except Exception as e:
                 QMessageBox.critical(self, "错误", f"加载文件失败: {str(e)}")
             
@@ -485,8 +483,15 @@ class SQLCompareApp(QMainWindow):
         
     def generate_sync_sql(self):
         """生成同步SQL"""
-        if not self.left_tables or not self.right_tables:
-            QMessageBox.warning(self, "警告", "请先执行比较操作")
+        # 检查是否有表数据
+        if not self.left_tables and not self.right_tables:
+            QMessageBox.warning(self, "警告", "请先加载左侧和右侧的表结构数据")
+            return
+        elif not self.left_tables:
+            QMessageBox.warning(self, "警告", "请先加载左侧表结构数据")
+            return
+        elif not self.right_tables:
+            QMessageBox.warning(self, "警告", "请先加载右侧表结构数据")
             return
             
         # 创建目标库选择对话框
@@ -510,7 +515,7 @@ class SQLCompareApp(QMainWindow):
                 self.show_sql_window(title, sync_sql)
                 
             except Exception as e:
-                QMessageBox.critical(self, "错误", f"生成同步SQL时出错: {str(e)}")
+                QMessageBox.critical(self, "错误", f"生成同步SQL时出错:\n{str(e)}")
                 
     def show_sql_window(self, title, sql_content):
         """显示SQL窗口"""
@@ -519,22 +524,45 @@ class SQLCompareApp(QMainWindow):
         dialog.setGeometry(200, 200, 900, 700)
         
         layout = QVBoxLayout(dialog)
+        layout.setSpacing(10)
+        layout.setContentsMargins(15, 15, 15, 15)
+        
+        # 提示信息
+        info_label = QLabel("生成的同步SQL语句如下，请仔细检查后执行：")
+        info_label.setStyleSheet("color: #666; font-weight: bold; margin-bottom: 10px;")
+        layout.addWidget(info_label)
         
         # SQL文本区域
         text_edit = QTextEdit()
         text_edit.setPlainText(sql_content)
         text_edit.setFont(QFont("Consolas", 10))
+        text_edit.setStyleSheet("background-color: #f8f9fa; border: 1px solid #ddd;")
         layout.addWidget(text_edit)
         
-        # 按钮
+        # 按钮区域
         btn_layout = QHBoxLayout()
+        
+        # 复制按钮
+        copy_btn = QPushButton("复制SQL")
+        copy_btn.clicked.connect(lambda: self.copy_to_clipboard(sql_content))
+        btn_layout.addWidget(copy_btn)
+        
+        btn_layout.addStretch()
+        
+        # 关闭按钮
         close_btn = QPushButton("关闭")
         close_btn.clicked.connect(dialog.accept)
-        btn_layout.addStretch()
         btn_layout.addWidget(close_btn)
+        
         layout.addLayout(btn_layout)
         
         dialog.exec()
+        
+    def copy_to_clipboard(self, text):
+        """复制文本到剪贴板"""
+        clipboard = QApplication.clipboard()
+        clipboard.setText(text)
+        QMessageBox.information(self, "提示", "SQL已复制到剪贴板")
         
     def update_history_lists(self):
         """更新历史记录列表"""
@@ -567,6 +595,7 @@ class SQLCompareApp(QMainWindow):
                         self.left_tables = self.sql_parser.parse_file(history.value)
                     else:
                         self.right_tables = self.sql_parser.parse_file(history.value)
+                    
                     # 显示表结构
                     self.show_tables(side)
                 elif history.type == "connection":
@@ -738,7 +767,14 @@ class TargetDatabaseDialog(QDialog):
         
         # 标题
         title_label = QLabel("请选择目标数据库")
+        title_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #333;")
         layout.addWidget(title_label)
+        
+        # 说明文字
+        desc_label = QLabel("选择要将哪个数据库作为目标，另一个数据库的结构将同步到目标数据库中")
+        desc_label.setStyleSheet("color: #666; font-size: 12px; margin-bottom: 10px;")
+        desc_label.setWordWrap(True)
+        layout.addWidget(desc_label)
         
         # 获取左右数据库的名称
         left_history = self.connection_manager.get_history("left")

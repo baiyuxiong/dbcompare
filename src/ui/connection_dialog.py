@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from typing import Optional, Callable
 from ..data.models import Connection, ConnectionManager
+from .styles import StyleManager
 from datetime import datetime
 import mysql.connector
 
@@ -13,71 +14,88 @@ class ConnectionDialog(tk.Toplevel):
         self.on_connection_selected = on_connection_selected
         self.selected_connection: Optional[Connection] = None
         
+        # 设置样式
+        self.colors, self.fonts = StyleManager.setup_styles()
+        
         self._init_ui()
         self._load_connections()
 
     def _init_ui(self):
+        # 设置窗口样式
+        self.configure(bg=self.colors['light'])
+        
         # 创建主框架
-        main_frame = ttk.Frame(self, padding="10")
+        main_frame = ttk.Frame(self, padding="15")
         main_frame.pack(fill=tk.BOTH, expand=True)
 
         # 连接列表
-        list_frame = ttk.LabelFrame(main_frame, text="连接列表", padding="5")
-        list_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
+        list_frame = ttk.LabelFrame(main_frame, text="连接列表", padding="10")
+        list_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
 
-        self.connection_list = ttk.Treeview(list_frame, columns=("name", "database"), show="headings")
-        self.connection_list.heading("name", text="名称")
+        self.connection_list = ttk.Treeview(list_frame, columns=("name", "database"), show="headings", height=15)
+        self.connection_list.heading("name", text="连接名称")
         self.connection_list.heading("database", text="数据库名称")
-        self.connection_list.pack(fill=tk.BOTH, expand=True)
+        self.connection_list.column("name", width=150)
+        self.connection_list.column("database", width=120)
+        self.connection_list.pack(fill=tk.BOTH, expand=True, pady=5)
         self.connection_list.bind("<<TreeviewSelect>>", self._on_select_connection)
         self.connection_list.bind("<Double-1>", self._on_double_click)
 
         # 按钮框架
         btn_frame = ttk.Frame(list_frame)
-        btn_frame.pack(fill=tk.X, pady=5)
+        btn_frame.pack(fill=tk.X, pady=10)
         
-        ttk.Button(btn_frame, text="新建", command=self._on_new).pack(side=tk.LEFT, padx=2)
-        ttk.Button(btn_frame, text="删除", command=self._on_delete).pack(side=tk.LEFT, padx=2)
+        ttk.Button(btn_frame, text="新建", 
+                  style='Success.TButton',
+                  command=self._on_new).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="删除", 
+                  style='Warning.TButton',
+                  command=self._on_delete).pack(side=tk.LEFT, padx=5)
 
         # 连接详情框架
-        detail_frame = ttk.LabelFrame(main_frame, text="连接详情", padding="5")
+        detail_frame = ttk.LabelFrame(main_frame, text="连接详情", padding="10")
         detail_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         # 基本信息
-        ttk.Label(detail_frame, text="名称:").grid(row=0, column=0, sticky=tk.W, pady=2)
-        self.name_entry = ttk.Entry(detail_frame)
-        self.name_entry.grid(row=0, column=1, sticky=tk.EW, pady=2)
+        ttk.Label(detail_frame, text="连接名称:", font=self.fonts['small']).grid(row=0, column=0, sticky=tk.W, pady=5)
+        self.name_entry = ttk.Entry(detail_frame, font=self.fonts['small'])
+        self.name_entry.grid(row=0, column=1, sticky=tk.EW, pady=5, padx=(10, 0))
 
         # MySQL配置框架
-        self.mysql_frame = ttk.LabelFrame(detail_frame, text="MySQL配置", padding="5")
-        self.mysql_frame.grid(row=1, column=0, columnspan=2, sticky=tk.EW, pady=5)
+        self.mysql_frame = ttk.LabelFrame(detail_frame, text="MySQL配置", padding="10")
+        self.mysql_frame.grid(row=1, column=0, columnspan=2, sticky=tk.EW, pady=10)
 
-        ttk.Label(self.mysql_frame, text="主机:").grid(row=0, column=0, sticky=tk.W, pady=2)
-        self.host_entry = ttk.Entry(self.mysql_frame)
-        self.host_entry.grid(row=0, column=1, sticky=tk.EW, pady=2)
+        ttk.Label(self.mysql_frame, text="主机地址:", font=self.fonts['small']).grid(row=0, column=0, sticky=tk.W, pady=5)
+        self.host_entry = ttk.Entry(self.mysql_frame, font=self.fonts['small'])
+        self.host_entry.grid(row=0, column=1, sticky=tk.EW, pady=5, padx=(10, 0))
 
-        ttk.Label(self.mysql_frame, text="端口:").grid(row=1, column=0, sticky=tk.W, pady=2)
-        self.port_entry = ttk.Entry(self.mysql_frame)
-        self.port_entry.grid(row=1, column=1, sticky=tk.EW, pady=2)
+        ttk.Label(self.mysql_frame, text="端口号:", font=self.fonts['small']).grid(row=1, column=0, sticky=tk.W, pady=5)
+        self.port_entry = ttk.Entry(self.mysql_frame, font=self.fonts['small'])
+        self.port_entry.grid(row=1, column=1, sticky=tk.EW, pady=5, padx=(10, 0))
+        self.port_entry.insert(0, "3306")  # 默认端口
 
-        ttk.Label(self.mysql_frame, text="用户名:").grid(row=2, column=0, sticky=tk.W, pady=2)
-        self.username_entry = ttk.Entry(self.mysql_frame)
-        self.username_entry.grid(row=2, column=1, sticky=tk.EW, pady=2)
+        ttk.Label(self.mysql_frame, text="用户名:", font=self.fonts['small']).grid(row=2, column=0, sticky=tk.W, pady=5)
+        self.username_entry = ttk.Entry(self.mysql_frame, font=self.fonts['small'])
+        self.username_entry.grid(row=2, column=1, sticky=tk.EW, pady=5, padx=(10, 0))
 
-        ttk.Label(self.mysql_frame, text="密码:").grid(row=3, column=0, sticky=tk.W, pady=2)
-        self.password_entry = ttk.Entry(self.mysql_frame, show="*")
-        self.password_entry.grid(row=3, column=1, sticky=tk.EW, pady=2)
+        ttk.Label(self.mysql_frame, text="密码:", font=self.fonts['small']).grid(row=3, column=0, sticky=tk.W, pady=5)
+        self.password_entry = ttk.Entry(self.mysql_frame, show="*", font=self.fonts['small'])
+        self.password_entry.grid(row=3, column=1, sticky=tk.EW, pady=5, padx=(10, 0))
 
-        ttk.Label(self.mysql_frame, text="数据库:").grid(row=4, column=0, sticky=tk.W, pady=2)
-        self.database_entry = ttk.Entry(self.mysql_frame)
-        self.database_entry.grid(row=4, column=1, sticky=tk.EW, pady=2)
+        ttk.Label(self.mysql_frame, text="数据库名:", font=self.fonts['small']).grid(row=4, column=0, sticky=tk.W, pady=5)
+        self.database_entry = ttk.Entry(self.mysql_frame, font=self.fonts['small'])
+        self.database_entry.grid(row=4, column=1, sticky=tk.EW, pady=5, padx=(10, 0))
 
         # 按钮框架
         btn_frame = ttk.Frame(detail_frame)
-        btn_frame.grid(row=5, column=0, columnspan=2, pady=10)
+        btn_frame.grid(row=5, column=0, columnspan=2, pady=15)
         
-        ttk.Button(btn_frame, text="测试连接", command=self._test_connection).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="保存", command=self._on_save).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="测试连接", 
+                  style='Primary.TButton',
+                  command=self._test_connection).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="保存", 
+                  style='Success.TButton',
+                  command=self._on_save).pack(side=tk.LEFT, padx=5)
 
     def _load_connections(self):
         # 清空列表
@@ -257,31 +275,43 @@ class SelectConnectionDialog(tk.Toplevel):
         self.on_connection_selected = on_connection_selected
         self.selected_connection: Optional[Connection] = None
         
+        # 设置样式
+        self.colors, self.fonts = StyleManager.setup_styles()
+        
         self._init_ui()
         self._load_connections()
 
     def _init_ui(self):
+        # 设置窗口样式
+        self.configure(bg=self.colors['light'])
+        
         # 创建主框架
-        main_frame = ttk.Frame(self, padding="10")
+        main_frame = ttk.Frame(self, padding="15")
         main_frame.pack(fill=tk.BOTH, expand=True)
 
         # 连接列表
-        list_frame = ttk.LabelFrame(main_frame, text="连接列表", padding="5")
+        list_frame = ttk.LabelFrame(main_frame, text="选择连接", padding="10")
         list_frame.pack(fill=tk.BOTH, expand=True)
 
-        self.connection_list = ttk.Treeview(list_frame, columns=("name", "database"), show="headings")
-        self.connection_list.heading("name", text="名称")
+        self.connection_list = ttk.Treeview(list_frame, columns=("name", "database"), show="headings", height=12)
+        self.connection_list.heading("name", text="连接名称")
         self.connection_list.heading("database", text="数据库名称")
-        self.connection_list.pack(fill=tk.BOTH, expand=True)
+        self.connection_list.column("name", width=200)
+        self.connection_list.column("database", width=150)
+        self.connection_list.pack(fill=tk.BOTH, expand=True, pady=5)
         self.connection_list.bind("<<TreeviewSelect>>", self._on_select_connection)
         self.connection_list.bind("<Double-1>", self._on_double_click)
 
         # 按钮框架
         btn_frame = ttk.Frame(list_frame)
-        btn_frame.pack(fill=tk.X, pady=5)
+        btn_frame.pack(fill=tk.X, pady=10)
         
-        ttk.Button(btn_frame, text="选择", command=self._on_select).pack(side=tk.LEFT, padx=2)
-        ttk.Button(btn_frame, text="取消", command=self.destroy).pack(side=tk.LEFT, padx=2)
+        ttk.Button(btn_frame, text="选择", 
+                  style='Success.TButton',
+                  command=self._on_select).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="取消", 
+                  style='Warning.TButton',
+                  command=self.destroy).pack(side=tk.LEFT, padx=5)
 
     def _load_connections(self):
         # 清空列表

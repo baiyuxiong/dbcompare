@@ -4,6 +4,7 @@ import threading
 from .core.sql_parser import SQLParser
 from .core.sql_generator import SQLGenerator
 from .ui.connection_dialog import ConnectionDialog, SelectConnectionDialog
+from .ui.styles import StyleManager
 from .data.models import ConnectionManager, Connection, History
 from datetime import datetime
 from .core.db_connector import DBConnector
@@ -13,6 +14,9 @@ class SQLCompareApp:
         self.root = root
         self.root.title("MySQL表结构比较工具")
         self.root.geometry("1200x800")
+        
+        # 配置主题和样式
+        self.colors, self.fonts = StyleManager.setup_styles()
         
         # 初始化变量
         self.sync_scroll = tk.BooleanVar(value=True)
@@ -32,104 +36,139 @@ class SQLCompareApp:
         self.connection_manager.update_history_display_format()
         self.create_main_content()
         self.toggle_sync_scroll()
+    
+        # 设置根窗口背景色
+        self.root.configure(bg=self.colors['light'])
         
     def create_menu(self):
         """创建菜单栏"""
-        menu_frame = ttk.Frame(self.root)
-        menu_frame.pack(fill=tk.X, padx=5, pady=5)
+        # 创建主菜单框架，使用卡片样式
+        menu_frame = ttk.Frame(self.root, style='Card.TFrame')
+        menu_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        # 创建工具栏容器
+        toolbar_frame = ttk.Frame(menu_frame)
+        toolbar_frame.pack(fill=tk.X, padx=15, pady=10)
+        
+        # 左侧按钮组
+        left_btn_frame = ttk.Frame(toolbar_frame)
+        left_btn_frame.pack(side=tk.LEFT, fill=tk.Y)
         
         # 添加连接管理按钮
-        conn_btn = ttk.Button(menu_frame, text="连接管理", command=self._show_connection_dialog)
+        conn_btn = ttk.Button(left_btn_frame, 
+                             text="连接管理", 
+                             style='Primary.TButton',
+                             command=self._show_connection_dialog)
         conn_btn.pack(side=tk.LEFT, padx=5)
         
-        compare_btn = ttk.Button(menu_frame, text="开始比较", command=self.start_compare)
+        compare_btn = ttk.Button(left_btn_frame, 
+                                text="开始比较", 
+                                style='Success.TButton',
+                                command=self.start_compare)
         compare_btn.pack(side=tk.LEFT, padx=5)
         
-        generate_btn = ttk.Button(menu_frame, text="生成同步SQL", command=self.generate_sync_sql)
+        generate_btn = ttk.Button(left_btn_frame, 
+                                 text="生成同步SQL", 
+                                 style='Warning.TButton',
+                                 command=self.generate_sync_sql)
         generate_btn.pack(side=tk.LEFT, padx=5)
+        
+        # 右侧选项组
+        right_option_frame = ttk.Frame(toolbar_frame)
+        right_option_frame.pack(side=tk.RIGHT, fill=tk.Y)
         
         # 添加同步滚动开关
         sync_check = ttk.Checkbutton(
-            menu_frame, 
+            right_option_frame, 
             text="同步滚动", 
             variable=self.sync_scroll,
             command=self.toggle_sync_scroll
         )
-        sync_check.pack(side=tk.LEFT, padx=5)
+        sync_check.pack(side=tk.LEFT, padx=10)
         
         # 添加隐藏相同行开关
         hide_same_check = ttk.Checkbutton(
-            menu_frame,
+            right_option_frame,
             text="隐藏相同行",
             variable=self.hide_same,
             command=self.show_differences
         )
-        hide_same_check.pack(side=tk.LEFT, padx=5)
+        hide_same_check.pack(side=tk.LEFT, padx=10)
         
         # 添加仅显示缺失开关
         show_missing_check = ttk.Checkbutton(
-            menu_frame,
+            right_option_frame,
             text="仅显示缺失",
             variable=self.show_missing_only,
             command=self.show_differences
         )
-        show_missing_check.pack(side=tk.LEFT, padx=5)
+        show_missing_check.pack(side=tk.LEFT, padx=10)
         
     def create_main_content(self):
         content_frame = ttk.Frame(self.root)
-        content_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        content_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
         
         # 左侧面板
-        left_frame = ttk.LabelFrame(content_frame, text="左侧数据源")
+        left_frame = ttk.LabelFrame(content_frame, text="左侧数据源", style='Title.TLabelframe')
         left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
         
         # 左侧选择框架
         left_select_frame = ttk.Frame(left_frame)
-        left_select_frame.pack(fill=tk.X, pady=5)
+        left_select_frame.pack(fill=tk.X, pady=10, padx=10)
         
         # 左侧工具栏
         left_toolbar = ttk.Frame(left_select_frame)
-        left_toolbar.pack(side=tk.LEFT, fill=tk.X, padx=5)
+        left_toolbar.pack(side=tk.LEFT, fill=tk.X)
         
         # 左侧连接按钮
         self.left_conn_btn = ttk.Button(left_toolbar, text="连接", 
+                                      style='Primary.TButton',
                                       command=lambda: self._show_connection_dialog("left"))
-        self.left_conn_btn.pack(side=tk.LEFT, padx=2)
+        self.left_conn_btn.pack(side=tk.LEFT, padx=5)
         
         # 左侧文件按钮
         self.left_file_btn = ttk.Button(left_toolbar, text="文件", 
+                                      style='Success.TButton',
                                       command=lambda: self.select_file("left"))
-        self.left_file_btn.pack(side=tk.LEFT, padx=2)
+        self.left_file_btn.pack(side=tk.LEFT, padx=5)
         
         # 左侧历史记录下拉框
-        self.left_history_combo = ttk.Combobox(left_select_frame, state="readonly", width=50)
+        history_label = ttk.Label(left_select_frame, text="历史记录:", font=self.fonts['small'])
+        history_label.pack(side=tk.LEFT, padx=(20, 5))
+        
+        self.left_history_combo = ttk.Combobox(left_select_frame, state="readonly", width=45)
         self.left_history_combo.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         self.left_history_combo.bind("<<ComboboxSelected>>", lambda e: self._on_history_select("left"))
         
         # 右侧面板
-        right_frame = ttk.LabelFrame(content_frame, text="右侧数据源")
+        right_frame = ttk.LabelFrame(content_frame, text="右侧数据源", style='Title.TLabelframe')
         right_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(5, 0))
         
         # 右侧选择框架
         right_select_frame = ttk.Frame(right_frame)
-        right_select_frame.pack(fill=tk.X, pady=5)
+        right_select_frame.pack(fill=tk.X, pady=10, padx=10)
         
         # 右侧工具栏
         right_toolbar = ttk.Frame(right_select_frame)
-        right_toolbar.pack(side=tk.LEFT, fill=tk.X, padx=5)
+        right_toolbar.pack(side=tk.LEFT, fill=tk.X)
         
         # 右侧连接按钮
         self.right_conn_btn = ttk.Button(right_toolbar, text="连接", 
+                                       style='Primary.TButton',
                                        command=lambda: self._show_connection_dialog("right"))
-        self.right_conn_btn.pack(side=tk.LEFT, padx=2)
+        self.right_conn_btn.pack(side=tk.LEFT, padx=5)
         
         # 右侧文件按钮
         self.right_file_btn = ttk.Button(right_toolbar, text="文件", 
+                                       style='Success.TButton',
                                        command=lambda: self.select_file("right"))
-        self.right_file_btn.pack(side=tk.LEFT, padx=2)
+        self.right_file_btn.pack(side=tk.LEFT, padx=5)
         
         # 右侧历史记录下拉框
-        self.right_history_combo = ttk.Combobox(right_select_frame, state="readonly", width=50)
+        history_label = ttk.Label(right_select_frame, text="历史记录:", font=self.fonts['small'])
+        history_label.pack(side=tk.LEFT, padx=(20, 5))
+        
+        self.right_history_combo = ttk.Combobox(right_select_frame, state="readonly", width=45)
         self.right_history_combo.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         self.right_history_combo.bind("<<ComboboxSelected>>", lambda e: self._on_history_select("right"))
         
@@ -140,28 +179,25 @@ class SQLCompareApp:
         self.left_tree = ttk.Treeview(left_frame, columns=("index", "field", "definition"), show="headings")
         self.left_tree.heading("index", text="序号")
         self.left_tree.heading("field", text="字段名")
-        self.left_tree.heading("definition", text="定义")
-        self.left_tree.column("index", width=50)
-        self.left_tree.column("field", width=150)
+        self.left_tree.heading("definition", text="字段定义")
+        self.left_tree.column("index", width=60)
+        self.left_tree.column("field", width=180)
         self.left_tree.column("definition", width=400)
-        self.left_tree.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.left_tree.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
         # 创建右侧表格
         self.right_tree = ttk.Treeview(right_frame, columns=("index", "field", "definition"), show="headings")
         self.right_tree.heading("index", text="序号")
         self.right_tree.heading("field", text="字段名")
-        self.right_tree.heading("definition", text="定义")
-        self.right_tree.column("index", width=50)
-        self.right_tree.column("field", width=150)
+        self.right_tree.heading("definition", text="字段定义")
+        self.right_tree.column("index", width=60)
+        self.right_tree.column("field", width=180)
         self.right_tree.column("definition", width=400)
-        self.right_tree.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.right_tree.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
         # 配置标签样式
         for tree in (self.left_tree, self.right_tree):
-            tree.tag_configure("table_header", font=('DejaVu Sans Mono', 10, 'bold'), background='#666666', foreground='white')
-            tree.tag_configure("header", font=('DejaVu Sans Mono', 10, 'bold'), background='#CCCCCC', foreground='black')
-            tree.tag_configure("different", foreground="#ff0000", font=('DejaVu Sans Mono', 10, 'bold'))
-            tree.tag_configure("missing", foreground="#0000ff", font=('DejaVu Sans Mono', 10, 'bold'))
+            StyleManager.configure_tree_tags(tree, self.colors)
             
         # 同步选择功能
         def on_tree_click(event, source_tree, target_tree):
@@ -500,10 +536,7 @@ class SQLCompareApp:
         
         # 配置标签样式
         for tree in (self.left_tree, self.right_tree):
-            tree.tag_configure("table_header", font=('DejaVu Sans Mono', 10, 'bold'), background='#666666', foreground='white')
-            tree.tag_configure("header", font=('DejaVu Sans Mono', 10, 'bold'), background='#CCCCCC', foreground='black')
-            tree.tag_configure("different", foreground="#ff0000", font=('DejaVu Sans Mono', 10, 'bold'))
-            tree.tag_configure("missing", foreground="#0000ff", font=('DejaVu Sans Mono', 10, 'bold'))
+            StyleManager.configure_tree_tags(tree, self.colors)
         
     def generate_sync_sql(self):
         if not self.left_tables or not self.right_tables:
@@ -512,10 +545,11 @@ class SQLCompareApp:
             
         # 创建目标库选择对话框
         target_dialog = tk.Toplevel(self.root)
-        target_dialog.title("选择目标库")
-        target_dialog.geometry("400x200")
+        target_dialog.title("🎯 选择目标库")
+        target_dialog.geometry("500x300")
         target_dialog.transient(self.root)
         target_dialog.grab_set()
+        target_dialog.configure(bg=self.colors['light'])
         
         # 居中显示
         target_dialog.geometry("+%d+%d" % (
@@ -536,21 +570,36 @@ class SQLCompareApp:
             right_name = right_history[0].display
             
         # 创建选择框架
-        main_frame = ttk.Frame(target_dialog, padding="20")
+        main_frame = ttk.Frame(target_dialog, padding="25")
         main_frame.pack(fill=tk.BOTH, expand=True)
         
-        ttk.Label(main_frame, text="请选择目标数据库：", font=("", 12, "bold")).pack(pady=(0, 20))
+        # 标题
+        title_label = ttk.Label(main_frame, text="请选择目标数据库", 
+                               font=self.fonts['title'],
+                               foreground=self.colors['dark'])
+        title_label.pack(pady=(0, 25))
         
         target_var = tk.StringVar(value="right")
         
-        ttk.Radiobutton(main_frame, text=f"以 {right_name} 为目标库（将左侧结构同步到右侧）", 
-                       variable=target_var, value="right").pack(anchor=tk.W, pady=5)
-        ttk.Radiobutton(main_frame, text=f"以 {left_name} 为目标库（将右侧结构同步到左侧）", 
-                       variable=target_var, value="left").pack(anchor=tk.W, pady=5)
+        # 选项框架
+        option_frame = ttk.LabelFrame(main_frame, text="同步方向", padding="15")
+        option_frame.pack(fill=tk.X, pady=10)
+        
+        ttk.Radiobutton(option_frame, 
+                       text=f"以 {right_name} 为目标库（将左侧结构同步到右侧）", 
+                       variable=target_var, 
+                       value="right",
+                       font=self.fonts['body']).pack(anchor=tk.W, pady=8)
+        
+        ttk.Radiobutton(option_frame, 
+                       text=f"以 {left_name} 为目标库（将右侧结构同步到左侧）", 
+                       variable=target_var, 
+                       value="left",
+                       font=self.fonts['body']).pack(anchor=tk.W, pady=8)
         
         # 按钮框架
         btn_frame = ttk.Frame(main_frame)
-        btn_frame.pack(pady=20)
+        btn_frame.pack(pady=25)
         
         def on_confirm():
             target_side = target_var.get()
@@ -569,10 +618,27 @@ class SQLCompareApp:
                 # 创建新窗口显示SQL
                 sql_window = tk.Toplevel(self.root)
                 sql_window.title(title)
-                sql_window.geometry("800x600")
+                sql_window.geometry("900x700")
+                sql_window.configure(bg=self.colors['light'])
                 
-                sql_text = scrolledtext.ScrolledText(sql_window, wrap=tk.WORD)
-                sql_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+                # 创建SQL显示框架
+                sql_frame = ttk.Frame(sql_window, padding="15")
+                sql_frame.pack(fill=tk.BOTH, expand=True)
+                
+                # SQL标题
+                sql_title = ttk.Label(sql_frame, text="生成的同步SQL语句", 
+                                     font=self.fonts['subtitle'],
+                                     foreground=self.colors['dark'])
+                sql_title.pack(pady=(0, 10))
+                
+                # SQL文本区域
+                sql_text = scrolledtext.ScrolledText(sql_window, 
+                                                   wrap=tk.WORD,
+                                                   font=self.fonts['code'],
+                                                   background=self.colors['white'],
+                                                   foreground=self.colors['dark'],
+                                                   insertbackground=self.colors['dark'])
+                sql_text.pack(fill=tk.BOTH, expand=True, padx=15, pady=15)
                 sql_text.insert(tk.END, sync_sql)
                 
             except Exception as e:
@@ -581,8 +647,12 @@ class SQLCompareApp:
         def on_cancel():
             target_dialog.destroy()
         
-        ttk.Button(btn_frame, text="确定", command=on_confirm).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="取消", command=on_cancel).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="确定", 
+                  style='Success.TButton',
+                  command=on_confirm).pack(side=tk.LEFT, padx=10)
+        ttk.Button(btn_frame, text="取消", 
+                  style='Warning.TButton',
+                  command=on_cancel).pack(side=tk.LEFT, padx=10)
         
         # 等待对话框关闭
         self.root.wait_window(target_dialog)

@@ -2,11 +2,11 @@
 
 
 a = Analysis(
-    ['/Users/baiyuxiong/code/dbcompare/app.py'],
+    ['app.py'],
     pathex=[],
     binaries=[],
     datas=[('connections.db', '.')],
-    hiddenimports=['tkinter', 'tkinter.ttk', 'tkinter.filedialog', 'tkinter.scrolledtext', 'tkinter.messagebox', '_tkinter', 'sqlite3', 'mysql.connector', 'mysql.connector.plugins.mysql_native_password', 'sqlparse', 'threading', 'datetime'],
+    hiddenimports=['sqlite3', 'mysql.connector', 'mysql.connector.plugins.mysql_native_password', 'sqlparse', 'threading', 'datetime', 'PyQt6', 'PyQt6.QtCore', 'PyQt6.QtGui', 'PyQt6.QtWidgets'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

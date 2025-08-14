@@ -1,27 +1,39 @@
-import tkinter as tk
-from tkinter import ttk, filedialog, scrolledtext, messagebox
-import threading
-from .core.sql_parser import SQLParser
-from .core.sql_generator import SQLGenerator
-from .ui.connection_dialog import ConnectionDialog, SelectConnectionDialog
-from .ui.styles import StyleManager
-from .data.models import ConnectionManager, Connection, History
-from datetime import datetime
-from .core.db_connector import DBConnector
+"""
+MySQL表结构比较工具 - PyQt6版本
+主应用程序
+"""
 
-class SQLCompareApp:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("MySQL表结构比较工具")
-        self.root.geometry("1200x800")
-        
-        # 配置主题和样式
-        self.colors, self.fonts = StyleManager.setup_styles()
+import sys
+import threading
+from datetime import datetime
+from PyQt6.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QPushButton, QLabel, QComboBox, QTreeWidget, QTreeWidgetItem,
+    QCheckBox, QFrame, QGroupBox, QSplitter, QMessageBox,
+    QFileDialog, QTextEdit, QDialog, QRadioButton, QButtonGroup,
+    QGridLayout, QLineEdit
+)
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFont, QColor
+
+from core.sql_parser import SQLParser
+from core.sql_generator import SQLGenerator
+from core.db_connector import DBConnector
+from data.models import ConnectionManager, Connection, History
+from ui.connection_dialog import ConnectionDialog, SelectConnectionDialog
+
+class SQLCompareApp(QMainWindow):
+    """MySQL表结构比较工具主窗口"""
+    
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("MySQL表结构比较工具")
+        self.setGeometry(100, 100, 1600, 1000)
         
         # 初始化变量
-        self.sync_scroll = tk.BooleanVar(value=True)
-        self.hide_same = tk.BooleanVar(value=False)
-        self.show_missing_only = tk.BooleanVar(value=False)
+        self.sync_scroll = True
+        self.hide_same = False
+        self.show_missing_only = False
         self.left_tables = {}
         self.right_tables = {}
         
@@ -32,349 +44,291 @@ class SQLCompareApp:
         self.connection_manager = ConnectionManager()
         
         # 创建界面
-        self.create_menu()
+        self.create_ui()
+        
+        # 初始化历史记录
         self.connection_manager.update_history_display_format()
-        self.create_main_content()
-        self.toggle_sync_scroll()
-    
-        # 设置根窗口背景色
-        self.root.configure(bg=self.colors['light'])
+        self.update_history_lists()
         
-    def create_menu(self):
-        """创建菜单栏"""
-        # 创建主菜单框架，使用卡片样式
-        menu_frame = ttk.Frame(self.root, style='Card.TFrame')
-        menu_frame.pack(fill=tk.X, padx=10, pady=10)
+    def create_ui(self):
+        """创建用户界面"""
+        # 创建中央部件
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
         
-        # 创建工具栏容器
-        toolbar_frame = ttk.Frame(menu_frame)
-        toolbar_frame.pack(fill=tk.X, padx=15, pady=10)
+        # 主布局
+        main_layout = QVBoxLayout(central_widget)
+        main_layout.setSpacing(15)
+        main_layout.setContentsMargins(20, 20, 20, 20)
         
-        # 左侧按钮组
-        left_btn_frame = ttk.Frame(toolbar_frame)
-        left_btn_frame.pack(side=tk.LEFT, fill=tk.Y)
+        # 工具栏
+        self.create_toolbar(main_layout)
         
-        # 添加连接管理按钮
-        conn_btn = ttk.Button(left_btn_frame, 
-                             text="连接管理", 
-                             style='Primary.TButton',
-                             command=self._show_connection_dialog)
-        conn_btn.pack(side=tk.LEFT, padx=5)
-        
-        compare_btn = ttk.Button(left_btn_frame, 
-                                text="开始比较", 
-                                style='Success.TButton',
-                                command=self.start_compare)
-        compare_btn.pack(side=tk.LEFT, padx=5)
-        
-        generate_btn = ttk.Button(left_btn_frame, 
-                                 text="生成同步SQL", 
-                                 style='Warning.TButton',
-                                 command=self.generate_sync_sql)
-        generate_btn.pack(side=tk.LEFT, padx=5)
-        
-        # 右侧选项组
-        right_option_frame = ttk.Frame(toolbar_frame)
-        right_option_frame.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        # 添加同步滚动开关
-        sync_check = ttk.Checkbutton(
-            right_option_frame, 
-            text="同步滚动", 
-            variable=self.sync_scroll,
-            command=self.toggle_sync_scroll
-        )
-        sync_check.pack(side=tk.LEFT, padx=10)
-        
-        # 添加隐藏相同行开关
-        hide_same_check = ttk.Checkbutton(
-            right_option_frame,
-            text="隐藏相同行",
-            variable=self.hide_same,
-            command=self.show_differences
-        )
-        hide_same_check.pack(side=tk.LEFT, padx=10)
-        
-        # 添加仅显示缺失开关
-        show_missing_check = ttk.Checkbutton(
-            right_option_frame,
-            text="仅显示缺失",
-            variable=self.show_missing_only,
-            command=self.show_differences
-        )
-        show_missing_check.pack(side=tk.LEFT, padx=10)
-        
-    def create_main_content(self):
-        content_frame = ttk.Frame(self.root)
-        content_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        # 主要内容区域
+        content_splitter = QSplitter(Qt.Orientation.Horizontal)
+        content_splitter.setChildrenCollapsible(False)
+        main_layout.addWidget(content_splitter, 1)  # 设置拉伸因子为1，让内容区域占用剩余空间
         
         # 左侧面板
-        left_frame = ttk.LabelFrame(content_frame, text="左侧数据源", style='Title.TLabelframe')
-        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
-        
-        # 左侧选择框架
-        left_select_frame = ttk.Frame(left_frame)
-        left_select_frame.pack(fill=tk.X, pady=10, padx=10)
-        
-        # 左侧工具栏
-        left_toolbar = ttk.Frame(left_select_frame)
-        left_toolbar.pack(side=tk.LEFT, fill=tk.X)
-        
-        # 左侧连接按钮
-        self.left_conn_btn = ttk.Button(left_toolbar, text="连接", 
-                                      style='Primary.TButton',
-                                      command=lambda: self._show_connection_dialog("left"))
-        self.left_conn_btn.pack(side=tk.LEFT, padx=5)
-        
-        # 左侧文件按钮
-        self.left_file_btn = ttk.Button(left_toolbar, text="文件", 
-                                      style='Success.TButton',
-                                      command=lambda: self.select_file("left"))
-        self.left_file_btn.pack(side=tk.LEFT, padx=5)
-        
-        # 左侧历史记录下拉框
-        history_label = ttk.Label(left_select_frame, text="历史记录:", font=self.fonts['small'])
-        history_label.pack(side=tk.LEFT, padx=(20, 5))
-        
-        self.left_history_combo = ttk.Combobox(left_select_frame, state="readonly", width=45)
-        self.left_history_combo.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
-        self.left_history_combo.bind("<<ComboboxSelected>>", lambda e: self._on_history_select("left"))
+        self.create_left_panel(content_splitter)
         
         # 右侧面板
-        right_frame = ttk.LabelFrame(content_frame, text="右侧数据源", style='Title.TLabelframe')
-        right_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(5, 0))
+        self.create_right_panel(content_splitter)
         
-        # 右侧选择框架
-        right_select_frame = ttk.Frame(right_frame)
-        right_select_frame.pack(fill=tk.X, pady=10, padx=10)
+        # 设置分割器比例
+        content_splitter.setSizes([800, 800])
         
-        # 右侧工具栏
-        right_toolbar = ttk.Frame(right_select_frame)
-        right_toolbar.pack(side=tk.LEFT, fill=tk.X)
+    def create_toolbar(self, parent_layout):
+        """创建工具栏"""
+        toolbar_frame = QFrame()
+        toolbar_layout = QHBoxLayout(toolbar_frame)
+        toolbar_layout.setSpacing(15)
         
-        # 右侧连接按钮
-        self.right_conn_btn = ttk.Button(right_toolbar, text="连接", 
-                                       style='Primary.TButton',
-                                       command=lambda: self._show_connection_dialog("right"))
-        self.right_conn_btn.pack(side=tk.LEFT, padx=5)
+        # 左侧按钮组
+        left_btn_layout = QHBoxLayout()
+        left_btn_layout.setSpacing(10)
         
-        # 右侧文件按钮
-        self.right_file_btn = ttk.Button(right_toolbar, text="文件", 
-                                       style='Success.TButton',
-                                       command=lambda: self.select_file("right"))
-        self.right_file_btn.pack(side=tk.LEFT, padx=5)
+        # 连接管理按钮
+        self.conn_btn = QPushButton("连接管理")
+        self.conn_btn.clicked.connect(self.show_connection_dialog)
+        left_btn_layout.addWidget(self.conn_btn)
         
-        # 右侧历史记录下拉框
-        history_label = ttk.Label(right_select_frame, text="历史记录:", font=self.fonts['small'])
-        history_label.pack(side=tk.LEFT, padx=(20, 5))
+        # 开始比较按钮
+        self.compare_btn = QPushButton("开始比较")
+        self.compare_btn.clicked.connect(self.start_compare)
+        left_btn_layout.addWidget(self.compare_btn)
         
-        self.right_history_combo = ttk.Combobox(right_select_frame, state="readonly", width=45)
-        self.right_history_combo.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
-        self.right_history_combo.bind("<<ComboboxSelected>>", lambda e: self._on_history_select("right"))
+        # 生成同步SQL按钮
+        self.generate_btn = QPushButton("生成同步SQL")
+        self.generate_btn.clicked.connect(self.generate_sync_sql)
+        left_btn_layout.addWidget(self.generate_btn)
         
-        # 初始化历史记录列表
-        self._update_history_lists()
+        toolbar_layout.addLayout(left_btn_layout)
+        toolbar_layout.addStretch()
         
-        # 创建左侧表格
-        self.left_tree = ttk.Treeview(left_frame, columns=("index", "field", "definition"), show="headings")
-        self.left_tree.heading("index", text="序号")
-        self.left_tree.heading("field", text="字段名")
-        self.left_tree.heading("definition", text="字段定义")
-        self.left_tree.column("index", width=60)
-        self.left_tree.column("field", width=180)
-        self.left_tree.column("definition", width=400)
-        self.left_tree.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        # 右侧选项组
+        right_option_layout = QHBoxLayout()
+        right_option_layout.setSpacing(15)
         
-        # 创建右侧表格
-        self.right_tree = ttk.Treeview(right_frame, columns=("index", "field", "definition"), show="headings")
-        self.right_tree.heading("index", text="序号")
-        self.right_tree.heading("field", text="字段名")
-        self.right_tree.heading("definition", text="字段定义")
-        self.right_tree.column("index", width=60)
-        self.right_tree.column("field", width=180)
-        self.right_tree.column("definition", width=400)
-        self.right_tree.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        # 同步滚动复选框
+        self.sync_scroll_check = QCheckBox("同步滚动")
+        self.sync_scroll_check.setChecked(self.sync_scroll)
+        self.sync_scroll_check.toggled.connect(self.toggle_sync_scroll)
+        right_option_layout.addWidget(self.sync_scroll_check)
         
-        # 配置标签样式
-        for tree in (self.left_tree, self.right_tree):
-            StyleManager.configure_tree_tags(tree, self.colors)
-            
-        # 同步选择功能
-        def on_tree_click(event, source_tree, target_tree):
-            def sync_selection():
-                # 获取当前选中的项
-                selected_items = source_tree.selection()
-                if not selected_items:
-                    return
-                    
-                # 获取所有项
-                source_items = source_tree.get_children()
-                target_items = target_tree.get_children()
-                
-                # 获取选中项在列表中的索引
-                try:
-                    index = source_items.index(selected_items[0])
-                    if index < len(target_items):
-                        # 立即清除之前的选择并选择新项
-                        target_tree.selection_remove(*target_tree.selection())
-                        target_tree.selection_add(target_items[index])
-                        target_tree.see(target_items[index])
-                        # 强制更新显示
-                        target_tree.update_idletasks()
-                except ValueError:
-                    pass
-            
-            # 使用after方法延迟执行同步操作
-            source_tree.after(100, sync_selection)
+        # 隐藏相同行复选框
+        self.hide_same_check = QCheckBox("隐藏相同行")
+        self.hide_same_check.setChecked(self.hide_same)
+        self.hide_same_check.toggled.connect(self.toggle_hide_same)
+        right_option_layout.addWidget(self.hide_same_check)
         
-        # 绑定点击事件
-        self.left_tree.bind("<Button-1>", lambda e: on_tree_click(e, self.left_tree, self.right_tree))
-        self.right_tree.bind("<Button-1>", lambda e: on_tree_click(e, self.right_tree, self.left_tree))
+        # 仅显示缺失复选框
+        self.show_missing_check = QCheckBox("仅显示缺失")
+        self.show_missing_check.setChecked(self.show_missing_only)
+        self.show_missing_check.toggled.connect(self.toggle_show_missing)
+        right_option_layout.addWidget(self.show_missing_check)
         
-        # 绑定键盘事件
-        self.left_tree.bind("<Up>", lambda e: on_tree_click(e, self.left_tree, self.right_tree))
-        self.left_tree.bind("<Down>", lambda e: on_tree_click(e, self.left_tree, self.right_tree))
-        self.right_tree.bind("<Up>", lambda e: on_tree_click(e, self.right_tree, self.left_tree))
-        self.right_tree.bind("<Down>", lambda e: on_tree_click(e, self.right_tree, self.left_tree))
+        toolbar_layout.addLayout(right_option_layout)
+        parent_layout.addWidget(toolbar_frame, 0)  # 设置拉伸因子为0，工具栏不拉伸
         
-    def toggle_sync_scroll(self):
-        """切换同步滚动状态"""
-        if self.sync_scroll.get():
-            # 启用同步滚动
-            self.left_tree.bind("<Button-4>", self.on_mousewheel)
-            self.left_tree.bind("<Button-5>", self.on_mousewheel)
-            self.right_tree.bind("<Button-4>", self.on_mousewheel)
-            self.right_tree.bind("<Button-5>", self.on_mousewheel)
-            self.root.bind_all("<Button-4>", self.on_mousewheel)
-            self.root.bind_all("<Button-5>", self.on_mousewheel)
-        else:
-            # 禁用同步滚动
-            self.left_tree.unbind("<Button-4>")
-            self.left_tree.unbind("<Button-5>")
-            self.right_tree.unbind("<Button-4>")
-            self.right_tree.unbind("<Button-5>")
-            self.root.unbind_all("<Button-4>")
-            self.root.unbind_all("<Button-5>")
-            
-    def on_mousewheel(self, event):
-        """处理鼠标滚轮事件"""
-        if not self.sync_scroll.get():
+    def create_left_panel(self, parent):
+        """创建左侧面板"""
+        left_group = QGroupBox("左侧数据源")
+        parent.addWidget(left_group)
+        
+        left_layout = QVBoxLayout(left_group)
+        left_layout.setSpacing(15)
+        
+        # 选择框架
+        select_frame = QFrame()
+        select_layout = QHBoxLayout(select_frame)
+        select_layout.setSpacing(10)
+        
+        # 连接按钮 - 固定大小
+        self.left_conn_btn = QPushButton("连接")
+        self.left_conn_btn.clicked.connect(lambda: self.show_connection_dialog("left"))
+        self.left_conn_btn.setFixedWidth(60)
+        select_layout.addWidget(self.left_conn_btn)
+        
+        # 文件按钮 - 固定大小
+        self.left_file_btn = QPushButton("文件")
+        self.left_file_btn.clicked.connect(lambda: self.select_file("left"))
+        self.left_file_btn.setFixedWidth(60)
+        select_layout.addWidget(self.left_file_btn)
+        
+        # 历史记录标签 - 固定大小
+        history_label = QLabel("历史记录:")
+        history_label.setFixedWidth(80)
+        select_layout.addWidget(history_label)
+        
+        # 历史记录下拉框 - 占用剩余空间
+        self.left_history_combo = QComboBox()
+        self.left_history_combo.currentTextChanged.connect(
+            lambda text: self.on_history_select("left", text)
+        )
+        select_layout.addWidget(self.left_history_combo, 1)  # 设置拉伸因子为1，占用剩余空间
+        
+        left_layout.addWidget(select_frame)
+        
+        # 树形视图
+        self.left_tree = QTreeWidget()
+        self.left_tree.setHeaderLabels(["序号", "字段名", "字段定义"])
+        self.left_tree.setColumnWidth(0, 60)
+        self.left_tree.setColumnWidth(1, 200)
+        self.left_tree.setColumnWidth(2, 500)
+        left_layout.addWidget(self.left_tree)
+        
+    def create_right_panel(self, parent):
+        """创建右侧面板"""
+        right_group = QGroupBox("右侧数据源")
+        parent.addWidget(right_group)
+        
+        right_layout = QVBoxLayout(right_group)
+        right_layout.setSpacing(15)
+        
+        # 选择框架
+        select_frame = QFrame()
+        select_layout = QHBoxLayout(select_frame)
+        select_layout.setSpacing(10)
+        
+        # 连接按钮 - 固定大小
+        self.right_conn_btn = QPushButton("连接")
+        self.right_conn_btn.clicked.connect(lambda: self.show_connection_dialog("right"))
+        self.right_conn_btn.setFixedWidth(60)
+        select_layout.addWidget(self.right_conn_btn)
+        
+        # 文件按钮 - 固定大小
+        self.right_file_btn = QPushButton("文件")
+        self.right_file_btn.clicked.connect(lambda: self.select_file("right"))
+        self.right_file_btn.setFixedWidth(60)
+        select_layout.addWidget(self.right_file_btn)
+        
+        # 历史记录标签 - 固定大小
+        history_label = QLabel("历史记录:")
+        history_label.setFixedWidth(80)
+        select_layout.addWidget(history_label)
+        
+        # 历史记录下拉框 - 占用剩余空间
+        self.right_history_combo = QComboBox()
+        self.right_history_combo.currentTextChanged.connect(
+            lambda text: self.on_history_select("right", text)
+        )
+        select_layout.addWidget(self.right_history_combo, 1)  # 设置拉伸因子为1，占用剩余空间
+        
+        right_layout.addWidget(select_frame)
+        
+        # 树形视图
+        self.right_tree = QTreeWidget()
+        self.right_tree.setHeaderLabels(["序号", "字段名", "字段定义"])
+        self.right_tree.setColumnWidth(0, 60)
+        self.right_tree.setColumnWidth(1, 200)
+        self.right_tree.setColumnWidth(2, 500)
+        right_layout.addWidget(self.right_tree)
+        
+        # 连接同步滚动
+        self.left_tree.verticalScrollBar().valueChanged.connect(self.sync_scroll_bars)
+        self.right_tree.verticalScrollBar().valueChanged.connect(self.sync_scroll_bars)
+        
+    def sync_scroll_bars(self):
+        """同步滚动条"""
+        if not self.sync_scroll:
             return
             
-        # 获取当前滚动的文本框
-        current_text = event.widget
-        if current_text == self.root:
-            # 如果事件来自根窗口，找到当前焦点所在的文本框
-            focused = self.root.focus_get()
-            if focused in (self.left_tree, self.right_tree):
-                current_text = focused
-            else:
-                return
-                
-        other_text = self.right_tree if current_text == self.left_tree else self.left_tree
+        sender = self.sender()
+        if sender == self.left_tree.verticalScrollBar():
+            self.right_tree.verticalScrollBar().setValue(sender.value())
+        elif sender == self.right_tree.verticalScrollBar():
+            self.left_tree.verticalScrollBar().setValue(sender.value())
+            
+    def toggle_sync_scroll(self, checked):
+        """切换同步滚动状态"""
+        self.sync_scroll = checked
         
-        # 使用after方法延迟100ms后执行滚动
-        def delayed_scroll():
-            # 获取当前滚动位置
-            current_pos = current_text.yview()[0]  # 只使用第一个值
-            other_text.yview_moveto(current_pos)
-            
-        self.root.after(100, delayed_scroll)
-
-    def select_file(self, side: str):
-        file_path = filedialog.askopenfilename(
-            title="选择SQL文件",
-            filetypes=[("SQL files", "*.sql"), ("All files", "*.*")]
+    def toggle_hide_same(self, checked):
+        """切换隐藏相同行状态"""
+        self.hide_same = checked
+        self.show_differences()
+        
+    def toggle_show_missing(self, checked):
+        """切换仅显示缺失状态"""
+        self.show_missing_only = checked
+        self.show_differences()
+        
+    def show_connection_dialog(self, side=None):
+        """显示连接对话框"""
+        if side is None or side is False:
+            # 连接管理按钮 - 显示完整的连接管理窗口
+            dialog = ConnectionDialog(self, self.connection_manager)
+            dialog.exec()
+        else:
+            # 连接按钮 - 只显示连接选择窗口
+            dialog = SelectConnectionDialog(self, self.connection_manager)
+            if dialog.exec() == QDialog.DialogCode.Accepted and dialog.selected_connection:
+                self.on_connection_selected(side, dialog.selected_connection)
+        
+    def select_file(self, side):
+        """选择SQL文件"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "选择SQL文件",
+            "",
+            "SQL files (*.sql);;All files (*.*)"
         )
+        
         if file_path:
-            # 添加到历史记录
-            history = History(
-                id=None,
-                side=side,
-                type="file",
-                value=file_path,
-                display=file_path,
-                last_used=datetime.now()
-            )
-            self.connection_manager.add_history(history)
-            
-            # 更新历史记录列表
-            self._update_history_lists()
-            
-            # 设置当前选择
-            if side == "left":
-                self.left_history_combo.set(file_path)
-            else:
-                self.right_history_combo.set(file_path)
+            try:
+                # 添加到历史记录
+                history = History(
+                    id=None,
+                    side=side,
+                    type="file",
+                    value=file_path,
+                    display=file_path,
+                    last_used=datetime.now()
+                )
+                self.connection_manager.add_history(history)
                 
-            # 解析SQL文件
-            if side == "left":
-                self.left_tables = self.sql_parser.parse_file(file_path)
-            else:
-                self.right_tables = self.sql_parser.parse_file(file_path)
+                # 更新历史记录列表
+                self.update_history_lists()
                 
-            # 显示表结构
-            self.show_tables(side)
-
+                # 设置当前选择
+                if side == "left":
+                    self.left_history_combo.setCurrentText(file_path)
+                else:
+                    self.right_history_combo.setCurrentText(file_path)
+                    
+                # 解析SQL文件
+                if side == "left":
+                    self.left_tables = self.sql_parser.parse_file(file_path)
+                else:
+                    self.right_tables = self.sql_parser.parse_file(file_path)
+                    
+                # 显示表结构
+                self.show_tables(side)
+                
+                QMessageBox.information(self, "成功", f"成功加载文件: {file_path}")
+                
+            except Exception as e:
+                QMessageBox.critical(self, "错误", f"加载文件失败: {str(e)}")
+            
     def start_compare(self):
+        """开始比较"""
         # 获取左右两侧的历史记录选择
-        left_display = self.left_history_combo.get()
-        right_display = self.right_history_combo.get()
+        left_display = self.left_history_combo.currentText()
+        right_display = self.right_history_combo.currentText()
         
         if not left_display or not right_display:
-            messagebox.showerror("错误", "请先选择两个数据源")
+            QMessageBox.warning(self, "警告", "请先选择两个数据源")
             return
             
-        def compare_thread():
-            try:
-                # 获取左侧历史记录
-                left_history = None
-                for history in self.connection_manager.get_history("left"):
-                    if history.display == left_display:
-                        left_history = history
-                        break
-                        
-                # 获取右侧历史记录
-                right_history = None
-                for history in self.connection_manager.get_history("right"):
-                    if history.display == right_display:
-                        right_history = history
-                        break
-                
-                if not left_history or not right_history:
-                    messagebox.showerror("错误", "无法找到选中的数据源")
-                    return
-                
-                # 处理左侧数据源
-                if left_history.type == "file":
-                    self.left_tables = self.sql_parser.parse_file(left_history.value)
-                elif left_history.type == "connection":
-                    conn = self.connection_manager.get_connection(left_history.value)
-                    if conn.type == "agent":
-                        messagebox.showerror("错误", "暂不支持Agent类型的连接")
-                        return
-                
-                # 处理右侧数据源
-                if right_history.type == "file":
-                    self.right_tables = self.sql_parser.parse_file(right_history.value)
-                elif right_history.type == "connection":
-                    conn = self.connection_manager.get_connection(right_history.value)
-                    if conn.type == "agent":
-                        messagebox.showerror("错误", "暂不支持Agent类型的连接")
-                        return
-                
-                # 比较并显示差异
-                self.show_differences()
-            except Exception as e:
-                messagebox.showerror("错误", f"比较过程中出错: {str(e)}")
-                
-        # 使用线程执行比较操作
-        threading.Thread(target=compare_thread, daemon=True).start()
+        # 执行比较
+        self.show_differences()
         
     def show_differences(self):
+        """显示差异"""
         # 清空显示区域
-        self.left_tree.delete(*self.left_tree.get_children())
-        self.right_tree.delete(*self.right_tree.get_children())
+        self.left_tree.clear()
+        self.right_tree.clear()
         
         # 获取差异
         differences = self.sql_parser.compare_tables(self.left_tables, self.right_tables)
@@ -391,13 +345,6 @@ class SQLCompareApp:
             # 计算字段数量
             left_count = len(left_columns)
             right_count = len(right_columns)
-
-            # 计算索引数量
-            left_indexes = self.left_tables.get(table_name, {}).get('indexes', {})
-            right_indexes = self.right_tables.get(table_name, {}).get('indexes', {})
-
-            left_index_count = len(left_indexes)
-            right_index_count = len(right_indexes)
             
             # 检查表是否有差异
             has_table_differences = (
@@ -407,203 +354,90 @@ class SQLCompareApp:
             )
             
             # 如果启用了隐藏相同行且表没有差异，则跳过
-            if self.hide_same.get() and not has_table_differences:
+            if self.hide_same and not has_table_differences:
                 continue
-            
+                
             # 添加表头
-            self.left_tree.insert("", "end", values=(f"表{table_index}", f"表名: {table_name}", f"字段数: {left_count} 索引数: {left_index_count}"), tags=("table_header",))
-            self.right_tree.insert("", "end", values=(f"表{table_index}", f"表名: {table_name}", f"字段数: {right_count} 索引数: {right_index_count}"), tags=("table_header",))
+            left_table_item = QTreeWidgetItem(self.left_tree)
+            left_table_item.setText(0, f"表{table_index}")
+            left_table_item.setText(1, f"表名: {table_name}")
+            left_table_item.setText(2, f"字段数: {left_count}")
             
-            # 获取所有字段名
+            right_table_item = QTreeWidgetItem(self.right_tree)
+            right_table_item.setText(0, f"表{table_index}")
+            right_table_item.setText(1, f"表名: {table_name}")
+            right_table_item.setText(2, f"字段数: {right_count}")
+            
+            # 添加字段信息
             all_columns = sorted(set(list(left_columns.keys()) + list(right_columns.keys())))
-
-            if all_columns:
-                # 添加字段标题行
-                self.left_tree.insert("", "end", values=("", "字段", ""), tags=("header",))
-                self.right_tree.insert("", "end", values=("", "字段", ""), tags=("header",))
             
-                # 添加字段行
-                for col_index, col_name in enumerate(all_columns, 1):
-                    left_def = left_columns.get(col_name, "")
-                    right_def = right_columns.get(col_name, "")
-                    
-                    # 确定标签
-                    left_tags = []
-                    right_tags = []
-                    
-                    has_column_differences = False
-                    is_missing = False
-                    if table_name in differences.get('modified_tables', {}):
-                        changes = differences['modified_tables'][table_name]
-                        if 'columns' in changes:
-                            cols_changes = changes['columns']
-                            if col_name in cols_changes.get('removed_columns', {}):
-                                left_tags.append("different")
-                                has_column_differences = True
-                            if col_name in cols_changes.get('added_columns', {}):
-                                right_tags.append("different")
-                                has_column_differences = True
-                            if col_name in cols_changes.get('modified_columns', {}):
-                                left_tags.append("different")
-                                right_tags.append("different")
-                                has_column_differences = True
-                    
-                    if not left_def and right_def:
-                        left_tags.append("missing")
-                        has_column_differences = True
-                        is_missing = True
-                    if not right_def and left_def:
-                        right_tags.append("missing")
-                        has_column_differences = True
-                        is_missing = True
-                    
-                    # 如果启用了隐藏相同行且字段没有差异，则跳过
-                    if self.hide_same.get() and not has_column_differences:
-                        continue
-                        
-                    # 如果启用了仅显示缺失且不是缺失字段，则跳过
-                    if self.show_missing_only.get() and not is_missing:
-                        continue
-                    
-                    # 插入行，使用raw值
-                    left_def_display = left_def.get('raw', '') if isinstance(left_def, dict) else left_def
-                    right_def_display = right_def.get('raw', '') if isinstance(right_def, dict) else right_def
-                    
-                    self.left_tree.insert("", "end", values=(col_index, col_name, left_def_display or "[缺失]"), tags=tuple(left_tags))
-                    self.right_tree.insert("", "end", values=(col_index, col_name, right_def_display or "[缺失]"), tags=tuple(right_tags))
+            for col_index, col_name in enumerate(all_columns, 1):
+                left_def = left_columns.get(col_name, "")
+                right_def = right_columns.get(col_name, "")
                 
-            # 添加索引信息
-            all_indexes = sorted(set(list(left_indexes.keys()) + list(right_indexes.keys())))
-            if all_indexes:
-                # 添加索引标题行
-                self.left_tree.insert("", "end", values=("", "索引", ""), tags=("header",))
-                self.right_tree.insert("", "end", values=("", "索引", ""), tags=("header",))
+                # 确定是否有差异
+                has_column_differences = False
+                is_missing = False
                 
-                # 添加索引行
-                for idx_index, idx_name in enumerate(all_indexes, 1):
-                    left_idx = left_indexes.get(idx_name, {})
-                    right_idx = right_indexes.get(idx_name, {})
+                if table_name in differences.get('modified_tables', {}):
+                    changes = differences['modified_tables'][table_name]
+                    if 'columns' in changes:
+                        cols_changes = changes['columns']
+                        if (col_name in cols_changes.get('removed_columns', {}) or
+                            col_name in cols_changes.get('added_columns', {}) or
+                            col_name in cols_changes.get('modified_columns', {})):
+                            has_column_differences = True
+                
+                if not left_def and right_def:
+                    has_column_differences = True
+                    is_missing = True
+                if not right_def and left_def:
+                    has_column_differences = True
+                    is_missing = True
+                
+                # 如果启用了隐藏相同行且字段没有差异，则跳过
+                if self.hide_same and not has_column_differences:
+                    continue
                     
-                    # 格式化索引定义
-                    left_idx_def = f"{left_idx.get('type', '')} ({left_idx.get('columns', '')})" if left_idx else ""
-                    right_idx_def = f"{right_idx.get('type', '')} ({right_idx.get('columns', '')})" if right_idx else ""
-                    
-                    # 确定标签
-                    left_tags = []
-                    right_tags = []
-                    has_index_differences = False
-                    is_missing = False
-                    
-                    if table_name in differences.get('modified_tables', {}):
-                        changes = differences['modified_tables'][table_name]
-                        if 'indexes' in changes:
-                            idx_changes = changes['indexes']
-                            if idx_name in idx_changes.get('removed_indexes', []):
-                                left_tags.append("different")
-                                has_index_differences = True
-                            if idx_name in idx_changes.get('added_indexes', []):
-                                right_tags.append("different")
-                                has_index_differences = True
-                            if idx_name in idx_changes.get('modified_indexes', []):
-                                left_tags.append("different")
-                                right_tags.append("different")
-                                has_index_differences = True
-                    
-                    if not left_idx_def and right_idx_def:
-                        left_tags.append("missing")
-                        has_index_differences = True
-                        is_missing = True
-                    if not right_idx_def and left_idx_def:
-                        right_tags.append("missing")
-                        has_index_differences = True
-                        is_missing = True
-                    
-                    # 如果启用了隐藏相同行且索引没有差异，则跳过
-                    if self.hide_same.get() and not has_index_differences:
-                        continue
-                        
-                    # 如果启用了仅显示缺失且不是缺失索引，则跳过
-                    if self.show_missing_only.get() and not is_missing:
-                        continue
-                    
-                    # 插入行
-                    self.left_tree.insert("", "end", values=(idx_index, idx_name, left_idx_def or "[缺失]"), tags=tuple(left_tags))
-                    self.right_tree.insert("", "end", values=(idx_index, idx_name, right_idx_def or "[缺失]"), tags=tuple(right_tags))
-            
-            # 添加空行
-            self.left_tree.insert("", "end", values=("", "", ""))
-            self.right_tree.insert("", "end", values=("", "", ""))
-        
-        # 配置标签样式
-        for tree in (self.left_tree, self.right_tree):
-            StyleManager.configure_tree_tags(tree, self.colors)
+                # 如果启用了仅显示缺失且不是缺失字段，则跳过
+                if self.show_missing_only and not is_missing:
+                    continue
+                
+                # 插入行
+                left_def_display = left_def.get('raw', '') if isinstance(left_def, dict) else left_def
+                right_def_display = right_def.get('raw', '') if isinstance(right_def, dict) else right_def
+                
+                left_item = QTreeWidgetItem(left_table_item)
+                left_item.setText(0, str(col_index))
+                left_item.setText(1, col_name)
+                left_item.setText(2, left_def_display or "[缺失]")
+                
+                right_item = QTreeWidgetItem(right_table_item)
+                right_item.setText(0, str(col_index))
+                right_item.setText(1, col_name)
+                right_item.setText(2, right_def_display or "[缺失]")
+                
+                # 设置颜色
+                if has_column_differences:
+                    if is_missing:
+                        left_item.setForeground(2, QColor("green"))
+                        right_item.setForeground(2, QColor("green"))
+                    else:
+                        left_item.setForeground(2, QColor("red"))
+                        right_item.setForeground(2, QColor("red"))
         
     def generate_sync_sql(self):
+        """生成同步SQL"""
         if not self.left_tables or not self.right_tables:
-            messagebox.showerror("错误", "请先执行比较操作")
+            QMessageBox.warning(self, "警告", "请先执行比较操作")
             return
             
         # 创建目标库选择对话框
-        target_dialog = tk.Toplevel(self.root)
-        target_dialog.title("🎯 选择目标库")
-        target_dialog.geometry("500x300")
-        target_dialog.transient(self.root)
-        target_dialog.grab_set()
-        target_dialog.configure(bg=self.colors['light'])
-        
-        # 居中显示
-        target_dialog.geometry("+%d+%d" % (
-            self.root.winfo_rootx() + 100,
-            self.root.winfo_rooty() + 100))
-        
-        # 获取左右数据库的名称
-        left_name = "左侧数据库"
-        right_name = "右侧数据库"
-        
-        # 尝试从历史记录中获取数据库名称
-        left_history = self.connection_manager.get_history("left")
-        right_history = self.connection_manager.get_history("right")
-        
-        if left_history:
-            left_name = left_history[0].display
-        if right_history:
-            right_name = right_history[0].display
-            
-        # 创建选择框架
-        main_frame = ttk.Frame(target_dialog, padding="25")
-        main_frame.pack(fill=tk.BOTH, expand=True)
-        
-        # 标题
-        title_label = ttk.Label(main_frame, text="请选择目标数据库", 
-                               font=self.fonts['title'],
-                               foreground=self.colors['dark'])
-        title_label.pack(pady=(0, 25))
-        
-        target_var = tk.StringVar(value="right")
-        
-        # 选项框架
-        option_frame = ttk.LabelFrame(main_frame, text="同步方向", padding="15")
-        option_frame.pack(fill=tk.X, pady=10)
-        
-        ttk.Radiobutton(option_frame, 
-                       text=f"以 {right_name} 为目标库（将左侧结构同步到右侧）", 
-                       variable=target_var, 
-                       value="right",
-                       font=self.fonts['body']).pack(anchor=tk.W, pady=8)
-        
-        ttk.Radiobutton(option_frame, 
-                       text=f"以 {left_name} 为目标库（将右侧结构同步到左侧）", 
-                       variable=target_var, 
-                       value="left",
-                       font=self.fonts['body']).pack(anchor=tk.W, pady=8)
-        
-        # 按钮框架
-        btn_frame = ttk.Frame(main_frame)
-        btn_frame.pack(pady=25)
-        
-        def on_confirm():
-            target_side = target_var.get()
-            target_dialog.destroy()
+        dialog = TargetDatabaseDialog(self, self.connection_manager)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            target_side = dialog.target_side
+            left_name = dialog.left_name
+            right_name = dialog.right_name
             
             try:
                 if target_side == "right":
@@ -615,127 +449,54 @@ class SQLCompareApp:
                     sync_sql = self.sql_generator.generate_sync_sql(self.right_tables, self.left_tables)
                     title = f"同步SQL - 将 {right_name} 同步到 {left_name}"
                 
-                # 创建新窗口显示SQL
-                sql_window = tk.Toplevel(self.root)
-                sql_window.title(title)
-                sql_window.geometry("900x700")
-                sql_window.configure(bg=self.colors['light'])
-                
-                # 创建SQL显示框架
-                sql_frame = ttk.Frame(sql_window, padding="15")
-                sql_frame.pack(fill=tk.BOTH, expand=True)
-                
-                # SQL标题
-                sql_title = ttk.Label(sql_frame, text="生成的同步SQL语句", 
-                                     font=self.fonts['subtitle'],
-                                     foreground=self.colors['dark'])
-                sql_title.pack(pady=(0, 10))
-                
-                # SQL文本区域
-                sql_text = scrolledtext.ScrolledText(sql_window, 
-                                                   wrap=tk.WORD,
-                                                   font=self.fonts['code'],
-                                                   background=self.colors['white'],
-                                                   foreground=self.colors['dark'],
-                                                   insertbackground=self.colors['dark'])
-                sql_text.pack(fill=tk.BOTH, expand=True, padx=15, pady=15)
-                sql_text.insert(tk.END, sync_sql)
+                # 显示SQL窗口
+                self.show_sql_window(title, sync_sql)
                 
             except Exception as e:
-                messagebox.showerror("错误", f"生成同步SQL时出错: {str(e)}")
-        
-        def on_cancel():
-            target_dialog.destroy()
-        
-        ttk.Button(btn_frame, text="确定", 
-                  style='Success.TButton',
-                  command=on_confirm).pack(side=tk.LEFT, padx=10)
-        ttk.Button(btn_frame, text="取消", 
-                  style='Warning.TButton',
-                  command=on_cancel).pack(side=tk.LEFT, padx=10)
-        
-        # 等待对话框关闭
-        self.root.wait_window(target_dialog)
-
-    def _show_connection_dialog(self, side: str = None):
-        if side is None:
-            dialog = ConnectionDialog(self.root, self.connection_manager)
-            dialog.grab_set()
-        else:
-            dialog = SelectConnectionDialog(self.root, self.connection_manager, lambda conn: self._on_connection_selected(side, conn))
-            dialog.grab_set()
-        
-    def _on_connection_selected(self, side: str, connection: Connection):
-        # 生成显示文本
-        if connection.type == "mysql":
-            config = connection.config
-            database_name = config.get('database', '')
-            if database_name:
-                display = f"{connection.name} ({config['host']}:{config['port']}/{database_name})"
-            else:
-                display = f"{connection.name} ({config['host']}:{config['port']})"
-        else:
-            display = f"{connection.name} ({connection.config['url']})"
-            
-        # 添加到历史记录
-        history = History(
-            id=None,
-            side=side,
-            type="connection",
-            value=connection.id,
-            display=display,
-            last_used=datetime.now()
-        )
-        self.connection_manager.add_history(history)
-        
-        # 更新历史记录列表
-        self._update_history_lists()
-        
-        # 设置当前选择
-        if side == "left":
-            self.left_history_combo.set(display)
-        else:
-            self.right_history_combo.set(display)
-            
-        # 从数据库获取表结构
-        if connection.type == "mysql":
-            try:
-                # 连接到数据库
-                db_config = connection.config.copy()
-                db_config['user'] = db_config.pop('username')
-                self.db_connector.connect(db_config)
-                # 获取表结构
-                tables = self.db_connector.get_table_structure()
-                # 关闭连接
-                self.db_connector.close()
+                QMessageBox.critical(self, "错误", f"生成同步SQL时出错: {str(e)}")
                 
-                # 更新表结构
-                if side == "left":
-                    self.left_tables = tables
-                else:
-                    self.right_tables = tables
-                    
-                # 显示表结构
-                self.show_tables(side)
-            except Exception as e:
-                messagebox.showerror("错误", f"获取表结构失败: {str(e)}")
-        elif connection.type == "agent":
-            messagebox.showinfo("提示", "暂不支持Agent类型的连接")
+    def show_sql_window(self, title, sql_content):
+        """显示SQL窗口"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle(title)
+        dialog.setGeometry(200, 200, 900, 700)
         
-    def _update_history_lists(self):
+        layout = QVBoxLayout(dialog)
+        
+        # SQL文本区域
+        text_edit = QTextEdit()
+        text_edit.setPlainText(sql_content)
+        text_edit.setFont(QFont("Consolas", 10))
+        layout.addWidget(text_edit)
+        
+        # 按钮
+        btn_layout = QHBoxLayout()
+        close_btn = QPushButton("关闭")
+        close_btn.clicked.connect(dialog.accept)
+        btn_layout.addStretch()
+        btn_layout.addWidget(close_btn)
+        layout.addLayout(btn_layout)
+        
+        dialog.exec()
+        
+    def update_history_lists(self):
+        """更新历史记录列表"""
         # 获取历史记录
         left_history = self.connection_manager.get_history("left")
         right_history = self.connection_manager.get_history("right")
         
         # 更新左侧历史记录列表
-        self.left_history_combo["values"] = [h.display for h in left_history]
+        self.left_history_combo.clear()
+        for history in left_history:
+            self.left_history_combo.addItem(history.display)
             
         # 更新右侧历史记录列表
-        self.right_history_combo["values"] = [h.display for h in right_history]
-
-    def _on_history_select(self, side: str):
-        combo = self.left_history_combo if side == "left" else self.right_history_combo
-        display = combo.get()
+        self.right_history_combo.clear()
+        for history in right_history:
+            self.right_history_combo.addItem(history.display)
+            
+    def on_history_select(self, side, display):
+        """历史记录选择回调"""
         if not display:
             return
             
@@ -774,9 +535,9 @@ class SQLCompareApp:
                             # 显示表结构
                             self.show_tables(side)
                         except Exception as e:
-                            messagebox.showerror("错误", f"获取表结构失败: {str(e)}")
+                            QMessageBox.critical(self, "错误", f"获取表结构失败: {str(e)}")
                     elif conn.type == "agent":
-                        messagebox.showinfo("提示", "暂不支持Agent类型的连接")
+                        QMessageBox.information(self, "提示", "暂不支持Agent类型的连接")
                     
                 # 更新最后使用时间
                 self.connection_manager.update_history_last_used(history.id)
@@ -784,12 +545,70 @@ class SQLCompareApp:
                 
         # 显示差异
         self.show_tables(side)
-
-    def show_tables(self, side: str):
+        
+    def on_connection_selected(self, side, connection):
+        """连接选择回调"""
+        # 生成显示文本
+        if connection.type == "mysql":
+            config = connection.config
+            database_name = config.get('database', '')
+            if database_name:
+                display = f"{connection.name} ({config['host']}:{config['port']}/{database_name})"
+            else:
+                display = f"{connection.name} ({config['host']}:{config['port']})"
+        else:
+            display = f"{connection.name} ({connection.config['url']})"
+            
+        # 添加到历史记录
+        history = History(
+            id=None,
+            side=side,
+            type="connection",
+            value=connection.id,
+            display=display,
+            last_used=datetime.now()
+        )
+        self.connection_manager.add_history(history)
+        
+        # 更新历史记录列表
+        self.update_history_lists()
+        
+        # 设置当前选择
+        if side == "left":
+            self.left_history_combo.setCurrentText(display)
+        else:
+            self.right_history_combo.setCurrentText(display)
+            
+        # 从数据库获取表结构
+        if connection.type == "mysql":
+            try:
+                # 连接到数据库
+                db_config = connection.config.copy()
+                db_config['user'] = db_config.pop('username')
+                self.db_connector.connect(db_config)
+                # 获取表结构
+                tables = self.db_connector.get_table_structure()
+                # 关闭连接
+                self.db_connector.close()
+                
+                # 更新表结构
+                if side == "left":
+                    self.left_tables = tables
+                else:
+                    self.right_tables = tables
+                    
+                # 显示表结构
+                self.show_tables(side)
+            except Exception as e:
+                QMessageBox.critical(self, "错误", f"获取表结构失败: {str(e)}")
+        elif connection.type == "agent":
+            QMessageBox.information(self, "提示", "暂不支持Agent类型的连接")
+        
+    def show_tables(self, side):
         """显示表结构"""
         # 清空显示区域
         tree = self.left_tree if side == "left" else self.right_tree
-        tree.delete(*tree.get_children())
+        tree.clear()
         
         # 获取表数据
         tables = self.left_tables if side == "left" else self.right_tables
@@ -808,29 +627,138 @@ class SQLCompareApp:
             index_count = len(indexes)
             
             # 添加表头
-            tree.insert("", "end", values=(f"表{table_index}", f"表名: {table_name}", f"字段数: {column_count} 索引数: {index_count}"), tags=("table_header",))
+            table_item = QTreeWidgetItem(tree)
+            table_item.setText(0, f"表{table_index}")
+            table_item.setText(1, f"表名: {table_name}")
+            table_item.setText(2, f"字段数: {column_count} 索引数: {index_count}")
             
             # 添加字段信息
             if columns:
                 # 添加字段标题行
-                tree.insert("", "end", values=("", "字段", ""), tags=("header",))
+                header_item = QTreeWidgetItem(table_item)
+                header_item.setText(1, "字段")
                 
                 # 添加字段行
                 for col_index, (col_name, col_def) in enumerate(sorted(columns.items()), 1):
                     col_def_display = col_def.get('raw', '') if isinstance(col_def, dict) else col_def
-                    tree.insert("", "end", values=(col_index, col_name, col_def_display))
+                    field_item = QTreeWidgetItem(table_item)
+                    field_item.setText(0, str(col_index))
+                    field_item.setText(1, col_name)
+                    field_item.setText(2, col_def_display)
             
             # 添加索引信息
             if indexes:
                 # 添加索引标题行
-                tree.insert("", "end", values=("", "索引", ""), tags=("header",))
+                header_item = QTreeWidgetItem(table_item)
+                header_item.setText(1, "索引")
                 
                 # 添加索引行
                 for idx_index, (idx_name, idx_def) in enumerate(sorted(indexes.items()), 1):
                     idx_type = idx_def.get('type', '')
                     idx_columns = idx_def.get('columns', '')
                     idx_def_display = f"{idx_type} ({idx_columns})"
-                    tree.insert("", "end", values=(idx_index, idx_name, idx_def_display))
-            
-            # 添加空行
-            tree.insert("", "end", values=("", "", ""))
+                    index_item = QTreeWidgetItem(table_item)
+                    index_item.setText(0, str(idx_index))
+                    index_item.setText(1, idx_name)
+                    index_item.setText(2, idx_def_display)
+
+
+class TargetDatabaseDialog(QDialog):
+    """目标数据库选择对话框"""
+    
+    def __init__(self, parent, connection_manager):
+        super().__init__(parent)
+        self.connection_manager = connection_manager
+        self.target_side = "right"
+        self.left_name = "左侧数据库"
+        self.right_name = "右侧数据库"
+        
+        self.setWindowTitle("选择目标库")
+        self.setModal(True)
+        self.setGeometry(300, 300, 500, 300)
+        self.setup_ui()
+        
+    def setup_ui(self):
+        """设置界面"""
+        layout = QVBoxLayout(self)
+        layout.setSpacing(20)
+        layout.setContentsMargins(20, 20, 20, 20)
+        
+        # 标题
+        title_label = QLabel("请选择目标数据库")
+        layout.addWidget(title_label)
+        
+        # 获取左右数据库的名称
+        left_history = self.connection_manager.get_history("left")
+        right_history = self.connection_manager.get_history("right")
+        
+        if left_history:
+            self.left_name = left_history[0].display
+        if right_history:
+            self.right_name = right_history[0].display
+        
+        # 选项组
+        option_group = QGroupBox("同步方向")
+        option_layout = QVBoxLayout(option_group)
+        option_layout.setSpacing(15)
+        
+        # 单选按钮组
+        self.button_group = QButtonGroup()
+        
+        # 第一个选项
+        self.right_radio = QRadioButton(f"以 {self.right_name} 为目标库（将左侧结构同步到右侧）")
+        self.right_radio.setChecked(True)
+        self.button_group.addButton(self.right_radio, 1)
+        option_layout.addWidget(self.right_radio)
+        
+        # 第二个选项
+        self.left_radio = QRadioButton(f"以 {self.left_name} 为目标库（将右侧结构同步到左侧）")
+        self.button_group.addButton(self.left_radio, 2)
+        option_layout.addWidget(self.left_radio)
+        
+        layout.addWidget(option_group)
+        
+        # 按钮
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        
+        ok_btn = QPushButton("确定")
+        ok_btn.clicked.connect(self.accept)
+        btn_layout.addWidget(ok_btn)
+        
+        cancel_btn = QPushButton("取消")
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(cancel_btn)
+        
+        layout.addLayout(btn_layout)
+        
+        # 连接信号
+        self.button_group.buttonClicked.connect(self.on_button_clicked)
+        
+    def on_button_clicked(self, button):
+        """按钮点击事件"""
+        if button == self.right_radio:
+            self.target_side = "right"
+        elif button == self.left_radio:
+            self.target_side = "left"
+
+
+def main():
+    """主函数"""
+    app = QApplication(sys.argv)
+    
+    # 设置应用信息
+    app.setApplicationName("MySQL表结构比较工具")
+    app.setApplicationVersion("2.0.0")
+    app.setOrganizationName("DBCompare")
+    
+    # 创建主窗口
+    window = SQLCompareApp()
+    window.show()
+    
+    # 运行应用
+    sys.exit(app.exec())
+
+
+if __name__ == "__main__":
+    main() 

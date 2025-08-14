@@ -10,8 +10,8 @@ class Connection:
     name: str
     type: str  # 'mysql' or 'agent'
     config: dict
-    last_used: datetime
     created_at: datetime
+    updated_at: datetime
 
 @dataclass
 class History:
@@ -36,8 +36,8 @@ class ConnectionManager:
                     name TEXT NOT NULL,
                     type TEXT NOT NULL,
                     config TEXT NOT NULL,
-                    last_used TIMESTAMP NOT NULL,
-                    created_at TIMESTAMP NOT NULL
+                    created_at TIMESTAMP NOT NULL,
+                    updated_at TIMESTAMP NOT NULL
                 )
             """)
             cursor.execute("""
@@ -56,14 +56,14 @@ class ConnectionManager:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT INTO connections (name, type, config, last_used, created_at)
+                INSERT INTO connections (name, type, config, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?)
             """, (
                 connection.name,
                 connection.type,
                 json.dumps(connection.config),
-                connection.last_used.isoformat(),
-                connection.created_at.isoformat()
+                connection.created_at.isoformat(),
+                connection.updated_at.isoformat()
             ))
             conn.commit()
             return cursor.lastrowid
@@ -73,13 +73,13 @@ class ConnectionManager:
             cursor = conn.cursor()
             cursor.execute("""
                 UPDATE connections
-                SET name = ?, type = ?, config = ?, last_used = ?
+                SET name = ?, type = ?, config = ?, updated_at = ?
                 WHERE id = ?
             """, (
                 connection.name,
                 connection.type,
                 json.dumps(connection.config),
-                connection.last_used.isoformat(),
+                connection.updated_at.isoformat(),
                 connection.id
             ))
             conn.commit()
@@ -104,23 +104,23 @@ class ConnectionManager:
                     name=row[1],
                     type=row[2],
                     config=json.loads(row[3]),
-                    last_used=datetime.fromisoformat(row[4]),
-                    created_at=datetime.fromisoformat(row[5])
+                    created_at=datetime.fromisoformat(row[4]),
+                    updated_at=datetime.fromisoformat(row[5])
                 )
             return None
 
     def get_all_connections(self) -> list[Connection]:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM connections ORDER BY last_used DESC")
+            cursor.execute("SELECT * FROM connections ORDER BY updated_at DESC")
             return [
                 Connection(
                     id=row[0],
                     name=row[1],
                     type=row[2],
                     config=json.loads(row[3]),
-                    last_used=datetime.fromisoformat(row[4]),
-                    created_at=datetime.fromisoformat(row[5])
+                    created_at=datetime.fromisoformat(row[4]),
+                    updated_at=datetime.fromisoformat(row[5])
                 )
                 for row in cursor.fetchall()
             ]

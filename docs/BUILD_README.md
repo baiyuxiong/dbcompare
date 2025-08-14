@@ -22,16 +22,16 @@
 
 #### Linux
 - Ubuntu 18.04+ / CentOS 7+ / Arch Linux
-- 需要安装 tkinter：
+- 需要安装 PyQt6 相关依赖：
   ```bash
   # Ubuntu/Debian
-  sudo apt-get install python3-tk
+  sudo apt-get install python3-pyqt6
   
   # CentOS/RHEL
-  sudo yum install tkinter
+  sudo yum install python3-qt6
   
   # Arch Linux
-  sudo pacman -S tk
+  sudo pacman -S python-pyqt6
   ```
 
 ## 🚀 快速开始

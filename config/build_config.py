@@ -22,12 +22,6 @@ BUILD_CONFIG = {
     "description": APP_DESCRIPTION,
     "author": "DBCompare Team",
     "hidden_imports": [
-        "tkinter",
-        "tkinter.ttk",
-        "tkinter.filedialog",
-        "tkinter.scrolledtext",
-        "tkinter.messagebox",
-        "_tkinter",
         "sqlite3",
         "mysql.connector",
         "mysql.connector.plugins.mysql_native_password",

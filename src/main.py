@@ -8,7 +8,7 @@ import threading
 from datetime import datetime
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QLabel, QComboBox, QTreeWidget, QTreeWidgetItem,
+    QPushButton, QLabel, QComboBox, QTableWidget, QTableWidgetItem,
     QCheckBox, QFrame, QGroupBox, QSplitter, QMessageBox,
     QFileDialog, QTextEdit, QDialog, QRadioButton, QButtonGroup,
     QGridLayout, QLineEdit
@@ -28,7 +28,7 @@ class SQLCompareApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("MySQL表结构比较工具")
-        self.setGeometry(100, 100, 1600, 1000)
+        self.showMaximized()
         
         # 初始化变量
         self.sync_scroll = True
@@ -50,6 +50,7 @@ class SQLCompareApp(QMainWindow):
         self.connection_manager.update_history_display_format()
         self.update_history_lists()
         
+
     def create_ui(self):
         """创建用户界面"""
         # 创建中央部件
@@ -170,12 +171,15 @@ class SQLCompareApp(QMainWindow):
         
         left_layout.addWidget(select_frame)
         
-        # 树形视图
-        self.left_tree = QTreeWidget()
-        self.left_tree.setHeaderLabels(["序号", "字段名", "字段定义"])
+        # 表格视图
+        self.left_tree = QTableWidget()
+        self.left_tree.setColumnCount(3)
+        self.left_tree.setHorizontalHeaderLabels(["序号", "字段名", "字段定义"])
         self.left_tree.setColumnWidth(0, 60)
         self.left_tree.setColumnWidth(1, 200)
         self.left_tree.setColumnWidth(2, 500)
+        self.left_tree.setAlternatingRowColors(True)
+        self.left_tree.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         left_layout.addWidget(self.left_tree)
         
     def create_right_panel(self, parent):
@@ -217,12 +221,15 @@ class SQLCompareApp(QMainWindow):
         
         right_layout.addWidget(select_frame)
         
-        # 树形视图
-        self.right_tree = QTreeWidget()
-        self.right_tree.setHeaderLabels(["序号", "字段名", "字段定义"])
+        # 表格视图
+        self.right_tree = QTableWidget()
+        self.right_tree.setColumnCount(3)
+        self.right_tree.setHorizontalHeaderLabels(["序号", "字段名", "字段定义"])
         self.right_tree.setColumnWidth(0, 60)
         self.right_tree.setColumnWidth(1, 200)
         self.right_tree.setColumnWidth(2, 500)
+        self.right_tree.setAlternatingRowColors(True)
+        self.right_tree.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         right_layout.addWidget(self.right_tree)
         
         # 连接同步滚动
@@ -327,14 +334,18 @@ class SQLCompareApp(QMainWindow):
     def show_differences(self):
         """显示差异"""
         # 清空显示区域
-        self.left_tree.clear()
-        self.right_tree.clear()
+        self.left_tree.setRowCount(0)
+        self.right_tree.setRowCount(0)
         
         # 获取差异
         differences = self.sql_parser.compare_tables(self.left_tables, self.right_tables)
         
         # 获取所有表名
         all_tables = sorted(set(list(self.left_tables.keys()) + list(self.right_tables.keys())))
+        
+        # 准备数据
+        left_data = []
+        right_data = []
         
         # 为每个表创建数据
         for table_index, table_name in enumerate(all_tables, 1):
@@ -357,16 +368,9 @@ class SQLCompareApp(QMainWindow):
             if self.hide_same and not has_table_differences:
                 continue
                 
-            # 添加表头
-            left_table_item = QTreeWidgetItem(self.left_tree)
-            left_table_item.setText(0, f"表{table_index}")
-            left_table_item.setText(1, f"表名: {table_name}")
-            left_table_item.setText(2, f"字段数: {left_count}")
-            
-            right_table_item = QTreeWidgetItem(self.right_tree)
-            right_table_item.setText(0, f"表{table_index}")
-            right_table_item.setText(1, f"表名: {table_name}")
-            right_table_item.setText(2, f"字段数: {right_count}")
+            # 添加表头行
+            left_data.append([f"表{table_index}", f"表名: {table_name}", f"字段数: {left_count}"])
+            right_data.append([f"表{table_index}", f"表名: {table_name}", f"字段数: {right_count}"])
             
             # 添加字段信息
             all_columns = sorted(set(list(left_columns.keys()) + list(right_columns.keys())))
@@ -403,28 +407,81 @@ class SQLCompareApp(QMainWindow):
                 if self.show_missing_only and not is_missing:
                     continue
                 
-                # 插入行
+                # 准备数据
                 left_def_display = left_def.get('raw', '') if isinstance(left_def, dict) else left_def
                 right_def_display = right_def.get('raw', '') if isinstance(right_def, dict) else right_def
                 
-                left_item = QTreeWidgetItem(left_table_item)
-                left_item.setText(0, str(col_index))
-                left_item.setText(1, col_name)
-                left_item.setText(2, left_def_display or "[缺失]")
+                left_row = [str(col_index), col_name, left_def_display or "[缺失]"]
+                right_row = [str(col_index), col_name, right_def_display or "[缺失]"]
                 
-                right_item = QTreeWidgetItem(right_table_item)
-                right_item.setText(0, str(col_index))
-                right_item.setText(1, col_name)
-                right_item.setText(2, right_def_display or "[缺失]")
+                left_data.append(left_row)
+                right_data.append(right_row)
+        
+        # 填充表格
+        self.fill_table(self.left_tree, left_data)
+        self.fill_table(self.right_tree, right_data)
+        
+        # 设置差异颜色
+        self.set_difference_colors(left_data, right_data, differences)
+        
+    def fill_table(self, table, data):
+        """填充表格数据"""
+        table.setRowCount(len(data))
+        for row_index, row_data in enumerate(data):
+            for col_index, cell_data in enumerate(row_data):
+                item = QTableWidgetItem(str(cell_data))
+                table.setItem(row_index, col_index, item)
+                
+                # 设置表头行的样式
+                if row_data[1].startswith("表名:"):
+                    item.setBackground(QColor(240, 240, 240))
+                    font = item.font()
+                    font.setBold(True)
+                    item.setFont(font)
+                # 设置标题行的样式
+                elif row_data[1] in ["字段", "索引"]:
+                    item.setBackground(QColor(220, 220, 220))
+                    font = item.font()
+                    font.setBold(True)
+                    item.setFont(font)
+        
+    def set_difference_colors(self, left_data, right_data, differences):
+        """设置差异颜色"""
+        # 遍历数据，找到差异行并设置颜色
+        for row_index, (left_row, right_row) in enumerate(zip(left_data, right_data)):
+            # 跳过表头行
+            if left_row[1].startswith("表名:"):
+                continue
+                
+            # 检查是否是字段行
+            if len(left_row) >= 3 and len(right_row) >= 3:
+                col_name = left_row[1]
+                left_def = left_row[2]
+                right_def = right_row[2]
+                
+                # 检查是否有差异
+                has_differences = False
+                is_missing = False
+                
+                if left_def == "[缺失]" or right_def == "[缺失]":
+                    has_differences = True
+                    is_missing = True
+                elif left_def != right_def:
+                    has_differences = True
                 
                 # 设置颜色
-                if has_column_differences:
-                    if is_missing:
-                        left_item.setForeground(2, QColor("green"))
-                        right_item.setForeground(2, QColor("green"))
-                    else:
-                        left_item.setForeground(2, QColor("red"))
-                        right_item.setForeground(2, QColor("red"))
+                if has_differences:
+                    color = QColor("green") if is_missing else QColor("red")
+                    
+                    # 设置左侧表格颜色
+                    left_item = self.left_tree.item(row_index, 2)
+                    if left_item:
+                        left_item.setForeground(color)
+                    
+                    # 设置右侧表格颜色
+                    right_item = self.right_tree.item(row_index, 2)
+                    if right_item:
+                        right_item.setForeground(color)
         
     def generate_sync_sql(self):
         """生成同步SQL"""
@@ -607,14 +664,17 @@ class SQLCompareApp(QMainWindow):
     def show_tables(self, side):
         """显示表结构"""
         # 清空显示区域
-        tree = self.left_tree if side == "left" else self.right_tree
-        tree.clear()
+        table = self.left_tree if side == "left" else self.right_tree
+        table.setRowCount(0)
         
         # 获取表数据
         tables = self.left_tables if side == "left" else self.right_tables
         
         # 获取所有表名
         all_tables = sorted(tables.keys())
+        
+        # 准备数据
+        table_data = []
         
         # 为每个表创建数据
         for table_index, table_name in enumerate(all_tables, 1):
@@ -626,41 +686,33 @@ class SQLCompareApp(QMainWindow):
             column_count = len(columns)
             index_count = len(indexes)
             
-            # 添加表头
-            table_item = QTreeWidgetItem(tree)
-            table_item.setText(0, f"表{table_index}")
-            table_item.setText(1, f"表名: {table_name}")
-            table_item.setText(2, f"字段数: {column_count} 索引数: {index_count}")
+            # 添加表头行
+            table_data.append([f"表{table_index}", f"表名: {table_name}", f"字段数: {column_count} 索引数: {index_count}"])
             
             # 添加字段信息
             if columns:
                 # 添加字段标题行
-                header_item = QTreeWidgetItem(table_item)
-                header_item.setText(1, "字段")
+                table_data.append(["", "字段", ""])
                 
                 # 添加字段行
                 for col_index, (col_name, col_def) in enumerate(sorted(columns.items()), 1):
                     col_def_display = col_def.get('raw', '') if isinstance(col_def, dict) else col_def
-                    field_item = QTreeWidgetItem(table_item)
-                    field_item.setText(0, str(col_index))
-                    field_item.setText(1, col_name)
-                    field_item.setText(2, col_def_display)
+                    table_data.append([str(col_index), col_name, col_def_display])
             
             # 添加索引信息
             if indexes:
                 # 添加索引标题行
-                header_item = QTreeWidgetItem(table_item)
-                header_item.setText(1, "索引")
+                table_data.append(["", "索引", ""])
                 
                 # 添加索引行
                 for idx_index, (idx_name, idx_def) in enumerate(sorted(indexes.items()), 1):
                     idx_type = idx_def.get('type', '')
                     idx_columns = idx_def.get('columns', '')
                     idx_def_display = f"{idx_type} ({idx_columns})"
-                    index_item = QTreeWidgetItem(table_item)
-                    index_item.setText(0, str(idx_index))
-                    index_item.setText(1, idx_name)
-                    index_item.setText(2, idx_def_display)
+                    table_data.append([str(idx_index), idx_name, idx_def_display])
+        
+        # 填充表格
+        self.fill_table(table, table_data)
 
 
 class TargetDatabaseDialog(QDialog):

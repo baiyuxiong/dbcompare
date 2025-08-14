@@ -280,7 +280,6 @@ class ConnectionDialog(QDialog):
                     updated_at=datetime.now()
                 )
                 self.connection_manager.update_connection(connection)
-                QMessageBox.information(self, "成功", f"连接 '{name}' 更新成功！")
             else:
                 # 创建新连接
                 connection = Connection(
@@ -292,7 +291,6 @@ class ConnectionDialog(QDialog):
                     updated_at=datetime.now()
                 )
                 new_id = self.connection_manager.add_connection(connection)
-                QMessageBox.information(self, "成功", f"连接 '{name}' 创建成功！")
                 
             # 重新加载连接列表
             self.load_connections()

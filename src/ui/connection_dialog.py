@@ -196,6 +196,10 @@ class ConnectionDialog(QDialog):
             if connection:
                 self.load_connection_details(connection)
                 self.selected_connection = connection
+                print(f"选择了连接: {connection.name} (ID: {connection.id})")  # 调试信息
+        else:
+            # 如果没有选择有效的连接，清空选择状态
+            self.selected_connection = None
                 
     def load_connection_details(self, connection):
         """加载连接详情"""
@@ -222,6 +226,9 @@ class ConnectionDialog(QDialog):
         # 清空选择
         self.connection_tree.clearSelection()
         self.selected_connection = None
+        
+        # 确保表单处于新建模式
+        self.name_edit.setFocus()
         
     def save_connection(self):
         """保存连接"""
@@ -253,32 +260,49 @@ class ConnectionDialog(QDialog):
             'database': database
         }
         
-        # 创建或更新连接
-        if self.selected_connection:
-            # 更新现有连接
-            connection = Connection(
-                id=self.selected_connection.id,
-                name=name,
-                type="mysql",
-                config=config,
-                created_at=self.selected_connection.created_at,
-                updated_at=datetime.now()
-            )
-            self.connection_manager.update_connection(connection)
-        else:
-            # 创建新连接
-            connection = Connection(
-                id=None,
-                name=name,
-                type="mysql",
-                config=config,
-                created_at=datetime.now(),
-                updated_at=datetime.now()
-            )
-            self.connection_manager.add_connection(connection)
+        try:
+            # 调试信息
+            print(f"保存连接 - selected_connection: {self.selected_connection}")
+            if self.selected_connection:
+                print(f"更新连接: {self.selected_connection.name} (ID: {self.selected_connection.id})")
+            else:
+                print("创建新连接")
+                
+            # 创建或更新连接
+            if self.selected_connection:
+                # 更新现有连接
+                connection = Connection(
+                    id=self.selected_connection.id,
+                    name=name,
+                    type="mysql",
+                    config=config,
+                    created_at=self.selected_connection.created_at,
+                    updated_at=datetime.now()
+                )
+                self.connection_manager.update_connection(connection)
+                QMessageBox.information(self, "成功", f"连接 '{name}' 更新成功！")
+            else:
+                # 创建新连接
+                connection = Connection(
+                    id=None,
+                    name=name,
+                    type="mysql",
+                    config=config,
+                    created_at=datetime.now(),
+                    updated_at=datetime.now()
+                )
+                new_id = self.connection_manager.add_connection(connection)
+                QMessageBox.information(self, "成功", f"连接 '{name}' 创建成功！")
+                
+            # 重新加载连接列表
+            self.load_connections()
             
-        # 重新加载连接列表
-        self.load_connections()
+            # 如果是新建连接，清空表单
+            if not self.selected_connection:
+                self.add_connection()
+                
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"保存连接失败: {str(e)}")
         
     def delete_connection(self):
         """删除连接"""

@@ -1,4 +1,6 @@
 import sqlite3
+import os
+import sys
 from dataclasses import dataclass
 from typing import Optional
 import json
@@ -31,9 +33,39 @@ class AppConfig:
     updated_at: datetime
 
 class ConnectionManager:
-    def __init__(self, db_path: str = "connections.db"):
-        self.db_path = db_path
+    def __init__(self, db_path: str = None):
+        if db_path is None:
+            self.db_path = self._get_db_path()
+        else:
+            self.db_path = db_path
         self._init_db()
+    
+    def _get_db_path(self):
+        """获取数据库文件路径，在打包环境中使用用户目录"""
+        if getattr(sys, 'frozen', False):
+            # 打包环境，使用用户目录
+            import platform
+            if platform.system() == "Darwin":  # macOS
+                # 使用 ~/Library/Application Support/DBCompare/
+                app_support = os.path.expanduser("~/Library/Application Support/DBCompare")
+                if not os.path.exists(app_support):
+                    os.makedirs(app_support, exist_ok=True)
+                return os.path.join(app_support, "connections.db")
+            elif platform.system() == "Windows":
+                # 使用 %APPDATA%/DBCompare/
+                app_data = os.path.join(os.environ.get('APPDATA', ''), 'DBCompare')
+                if not os.path.exists(app_data):
+                    os.makedirs(app_data, exist_ok=True)
+                return os.path.join(app_data, "connections.db")
+            else:  # Linux
+                # 使用 ~/.config/DBCompare/
+                config_dir = os.path.expanduser("~/.config/DBCompare")
+                if not os.path.exists(config_dir):
+                    os.makedirs(config_dir, exist_ok=True)
+                return os.path.join(config_dir, "connections.db")
+        else:
+            # 开发环境，使用当前目录
+            return "connections.db"
 
     def _init_db(self):
         with sqlite3.connect(self.db_path) as conn:

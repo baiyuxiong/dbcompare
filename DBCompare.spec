@@ -54,5 +54,21 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='icon.png' if os.path.exists('icon.png') else None,
+    icon='icon.icns' if os.path.exists('icon.icns') else None,
+)
+
+
+# macOS .app 包配置
+app = BUNDLE(
+    exe,
+    name='DBCompare.app',
+    icon='icon.icns' if os.path.exists('icon.icns') else None,
+    bundle_identifier='com.dbcompare.app',
+    info_plist={
+        'CFBundleName': 'DBCompare',
+        'CFBundleDisplayName': 'DBCompare',
+        'CFBundleVersion': '1.0.0',
+        'CFBundleShortVersionString': '1.0.0',
+        'NSHighResolutionCapable': True,
+    },
 )

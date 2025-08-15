@@ -24,6 +24,7 @@ from data.models import ConnectionManager, Connection, History
 from ui.connection_dialog import ConnectionDialog, SelectConnectionDialog
 from ui.language_dialog import LanguageDialog
 from i18n.i18n_manager import get_i18n_manager, tr
+from utils.icon_manager import setup_window_icon, setup_application_icon
 
 class SQLCompareApp(QMainWindow):
     """MySQL表结构比较工具主窗口"""
@@ -430,19 +431,15 @@ class SQLCompareApp(QMainWindow):
         self.setStyleSheet(style_sheet)
         
         # 设置窗口图标和属性
-        # 尝试加载自定义图标
-        icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'icon.png')
-        if os.path.exists(icon_path):
-            self.setWindowIcon(QIcon(icon_path))
-        else:
-            # 如果自定义图标不存在，使用默认图标
-            self.setWindowIcon(self.style().standardIcon(self.style().StandardPixmap.SP_ComputerIcon))
+        setup_window_icon(self)
         
         # 设置字体
         app = QApplication.instance()
         if app:
             font = QFont("Segoe UI", 9)
             app.setFont(font)
+    
+
 
     def create_menu_bar(self):
         """创建菜单栏"""
@@ -1783,6 +1780,8 @@ class TargetDatabaseDialog(QDialog):
             self.target_side = "left"
 
 
+
+
 def main():
     """主函数"""
     app = QApplication(sys.argv)
@@ -1793,12 +1792,11 @@ def main():
     app.setOrganizationName("DBCompare")
     
     # 设置应用图标
-    icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'icon.png')
-    if os.path.exists(icon_path):
-        app.setWindowIcon(QIcon(icon_path))
+    setup_application_icon(app)
     
     # 创建主窗口
     window = SQLCompareApp()
+    setup_window_icon(window)
     window.show()
     
     # 运行应用

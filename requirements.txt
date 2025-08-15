@@ -1,4 +1,6 @@
 PyQt6>=6.4.0
 PyQt6-Qt6>=6.4.0
 PyQt6-sip>=13.4.0
-mysql-connector-python>=8.0.0   
+mysql-connector-python>=8.0.0
+sqlparse>=0.4.4
+pyinstaller>=5.0.0   

@@ -3,8 +3,14 @@ from sqlparse.sql import Identifier, IdentifierList, Parenthesis
 from sqlparse.tokens import Keyword, DML, Whitespace
 from utils.util import normalize_sql_definition
 class SQLParser:
-    def __init__(self):
-        pass
+    def __init__(self, ignore_case=True):
+        self.ignore_case = ignore_case
+        
+    def _normalize_name(self, name):
+        """标准化名称，根据ignore_case设置决定是否转换为小写"""
+        if self.ignore_case:
+            return name.lower()
+        return name
         
     def _parse_column_definition(self, definition):
         """解析MySQL列定义，返回详细信息
@@ -119,6 +125,12 @@ class SQLParser:
             
         return details
         
+    def parse_sql(self, sql_content):
+        """解析SQL字符串，返回表结构字典"""
+        # 解析SQL语句
+        statements = sqlparse.parse(sql_content)
+        return self._parse_statements(statements)
+        
     def parse_file(self, file_path):
         """解析SQL文件，返回表结构字典"""
         try:
@@ -134,6 +146,10 @@ class SQLParser:
             
         # 解析SQL语句
         statements = sqlparse.parse(content)
+        return self._parse_statements(statements)
+        
+    def _parse_statements(self, statements):
+        """解析SQL语句列表，返回表结构字典"""
         tables = {}
         
         for statement in statements:
@@ -239,34 +255,111 @@ class SQLParser:
             return normalized
         
         # 检查新增和删除的表
-        left_table_names = set(left_tables.keys())
-        right_table_names = set(right_tables.keys())
+        if self.ignore_case:
+            left_table_names = {self._normalize_name(name) for name in left_tables.keys()}
+            right_table_names = {self._normalize_name(name) for name in right_tables.keys()}
+            # 创建名称映射
+            left_name_map = {self._normalize_name(name): name for name in left_tables.keys()}
+            right_name_map = {self._normalize_name(name): name for name in right_tables.keys()}
+        else:
+            left_table_names = set(left_tables.keys())
+            right_table_names = set(right_tables.keys())
+            left_name_map = {name: name for name in left_tables.keys()}
+            right_name_map = {name: name for name in right_tables.keys()}
         
-        differences['added_tables'] = list(right_table_names - left_table_names)
-        differences['removed_tables'] = list(left_table_names - right_table_names)
+        differences['added_tables'] = [right_name_map[name] for name in (right_table_names - left_table_names)]
+        differences['removed_tables'] = [left_name_map[name] for name in (left_table_names - right_table_names)]
         
         # 检查修改的表
         common_tables = left_table_names & right_table_names
-        for table_name in common_tables:
-            left_cols = left_tables[table_name]['columns']
-            right_cols = right_tables[table_name]['columns']
-            left_indexes = left_tables[table_name]['indexes']
-            right_indexes = right_tables[table_name]['indexes']
+        for normalized_table_name in common_tables:
+            # 获取原始表名
+            left_original_name = left_name_map[normalized_table_name]
+            right_original_name = right_name_map[normalized_table_name]
+            
+            left_cols = left_tables[left_original_name]['columns']
+            right_cols = right_tables[right_original_name]['columns']
+            left_indexes = left_tables[left_original_name]['indexes']
+            right_indexes = right_tables[right_original_name]['indexes']
             
             table_diffs = {}
             
             # 比较列定义
-            if left_cols != right_cols:
+            if self.ignore_case:
+                left_col_names = {self._normalize_name(col): col for col in left_cols.keys()}
+                right_col_names = {self._normalize_name(col): col for col in right_cols.keys()}
+                # 在忽略大小写模式下，使用标准化后的定义进行比较
+                left_col_normalized = {self._normalize_name(col): {
+                    'raw': defn['raw'],
+                    'normalized': defn['normalized'],
+                    'details': defn['details']
+                } for col, defn in left_cols.items()}
+                right_col_normalized = {self._normalize_name(col): {
+                    'raw': defn['raw'],
+                    'normalized': defn['normalized'],
+                    'details': defn['details']
+                } for col, defn in right_cols.items()}
+            else:
+                left_col_names = {col: col for col in left_cols.keys()}
+                right_col_names = {col: col for col in right_cols.keys()}
+                left_col_normalized = left_cols
+                right_col_normalized = right_cols
+            
+                        # 检查列名差异（即使定义相同，列名大小写不同也算差异）
+            left_col_set = set(left_col_normalized.keys())
+            right_col_set = set(right_col_normalized.keys())
+            
+            # 在忽略大小写模式下，比较标准化后的定义
+            if self.ignore_case:
+                # 比较标准化后的定义
+                left_normalized_defs = {col: defn['normalized'] for col, defn in left_col_normalized.items()}
+                right_normalized_defs = {col: defn['normalized'] for col, defn in right_col_normalized.items()}
+                definitions_different = left_normalized_defs != right_normalized_defs
+            else:
+                # 比较原始定义
+                left_raw_defs = {col: defn['raw'] for col, defn in left_col_normalized.items()}
+                right_raw_defs = {col: defn['raw'] for col, defn in right_col_normalized.items()}
+                definitions_different = left_raw_defs != right_raw_defs
+                
+
+            
+            if left_col_set != right_col_set or definitions_different:
                 table_diffs['columns'] = {
-                    'added_columns': {col: defn['raw'] for col, defn in right_cols.items() if col not in left_cols},
-                    'removed_columns': {col: defn['raw'] for col, defn in left_cols.items() if col not in right_cols},
+                    'added_columns': {right_col_names[col]: defn['raw'] for col, defn in right_col_normalized.items() if col not in left_col_normalized},
+                    'removed_columns': {left_col_names[col]: defn['raw'] for col, defn in left_col_normalized.items() if col not in right_col_normalized},
                     'modified_columns': {}
                 }
                 
                 # 比较共同列的details
-                for col in set(left_cols.keys()) & set(right_cols.keys()):
-                    left_details = normalize_details(left_cols[col]['details'])
-                    right_details = normalize_details(right_cols[col]['details'])
+                common_cols = set(left_col_normalized.keys()) & set(right_col_normalized.keys())
+                for normalized_col in common_cols:
+                    left_original_col = left_col_names[normalized_col]
+                    right_original_col = right_col_names[normalized_col]
+                    
+                    # 在区分大小写模式下，如果原始定义不同，直接标记为修改
+                    if not self.ignore_case:
+                        left_raw = left_cols[left_original_col]['raw']
+                        right_raw = right_cols[right_original_col]['raw']
+                        if left_raw != right_raw:
+                            table_diffs['columns']['modified_columns'][left_original_col] = {
+                                'raw': {
+                                    'left': left_raw,
+                                    'right': right_raw
+                                },
+                                'details': {
+                                    'Definition': {
+                                        'left': left_raw,
+                                        'right': right_raw
+                                    }
+                                }
+                            }
+                            continue
+                    
+                    # 在忽略大小写模式下，比较details
+                    left_details = normalize_details(left_cols[left_original_col]['details'])
+                    right_details = normalize_details(right_cols[right_original_col]['details'])
+                    
+
                     
                     if left_details != right_details:
                         # 找出具体哪些属性发生了变化
@@ -279,14 +372,15 @@ class SQLParser:
                                 }
                         
                         if changed_attrs:
-                            table_diffs['columns']['modified_columns'][col] = {
+                            # 使用左侧的列名作为标准
+                            table_diffs['columns']['modified_columns'][left_original_col] = {
                                 'raw': {
-                                    'left': left_cols[col]['raw'],
-                                    'right': right_cols[col]['raw']
+                                    'left': left_cols[left_original_col]['raw'],
+                                    'right': right_cols[right_original_col]['raw']
                                 },
                                 'details': changed_attrs
                             }
-                            print("table_diffs",table_diffs['columns']['modified_columns'][col])
+                            print("table_diffs",table_diffs['columns']['modified_columns'][left_original_col])
             
             # 比较索引定义
             if left_indexes != right_indexes:
@@ -301,6 +395,7 @@ class SQLParser:
                 }
             
             if table_diffs:
-                differences['modified_tables'][table_name] = table_diffs
+                # 使用左侧的表名作为标准
+                differences['modified_tables'][left_original_name] = table_diffs
                 
         return differences 

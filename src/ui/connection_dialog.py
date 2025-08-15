@@ -5,11 +5,9 @@
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
     QPushButton, QTreeWidget, QTreeWidgetItem, QGroupBox,
-    QGridLayout, QMessageBox, QComboBox, QCheckBox,
-    QWidget, QTextEdit, QSplitter, QSizePolicy
+    QGridLayout, QMessageBox,  QSplitter, QSizePolicy
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont, QColor
 
 from data.models import Connection, ConnectionManager
 from datetime import datetime

@@ -34,11 +34,13 @@ class SQLCompareApp(QMainWindow):
         self.sync_scroll = True
         self.hide_same = False
         self.show_missing_only = False
+        self.sync_row_selection_enabled = False  # 控制行选择同步
+        self.ignore_case = True  # 是否忽略大小写
         self.left_tables = {}
         self.right_tables = {}
         
         # 初始化组件
-        self.sql_parser = SQLParser()
+        self.sql_parser = SQLParser(ignore_case=self.ignore_case)
         self.sql_generator = SQLGenerator()
         self.db_connector = DBConnector()
         self.connection_manager = ConnectionManager()
@@ -82,8 +84,13 @@ class SQLCompareApp(QMainWindow):
     def create_toolbar(self, parent_layout):
         """创建工具栏"""
         toolbar_frame = QFrame()
+        # 设置工具栏的最大高度，减少高度
+        toolbar_frame.setMaximumHeight(50)
+        toolbar_frame.setMinimumHeight(40)
         toolbar_layout = QHBoxLayout(toolbar_frame)
         toolbar_layout.setSpacing(15)
+        # 减少上下边距
+        toolbar_layout.setContentsMargins(10, 5, 10, 5)
         
         # 左侧按钮组
         left_btn_layout = QHBoxLayout()
@@ -92,16 +99,19 @@ class SQLCompareApp(QMainWindow):
         # 连接管理按钮
         self.conn_btn = QPushButton("连接管理")
         self.conn_btn.clicked.connect(self.show_connection_dialog)
+        self.conn_btn.setFixedHeight(30)  # 设置按钮高度
         left_btn_layout.addWidget(self.conn_btn)
         
         # 开始比较按钮
         self.compare_btn = QPushButton("开始比较")
         self.compare_btn.clicked.connect(self.start_compare)
+        self.compare_btn.setFixedHeight(30)  # 设置按钮高度
         left_btn_layout.addWidget(self.compare_btn)
         
         # 生成同步SQL按钮
         self.generate_btn = QPushButton("生成同步SQL")
         self.generate_btn.clicked.connect(self.generate_sync_sql)
+        self.generate_btn.setFixedHeight(30)  # 设置按钮高度
         left_btn_layout.addWidget(self.generate_btn)
         
         toolbar_layout.addLayout(left_btn_layout)
@@ -115,19 +125,29 @@ class SQLCompareApp(QMainWindow):
         self.sync_scroll_check = QCheckBox("同步滚动")
         self.sync_scroll_check.setChecked(self.sync_scroll)
         self.sync_scroll_check.toggled.connect(self.toggle_sync_scroll)
+        self.sync_scroll_check.setFixedHeight(30)  # 设置复选框高度
         right_option_layout.addWidget(self.sync_scroll_check)
         
         # 隐藏相同行复选框
         self.hide_same_check = QCheckBox("隐藏相同行")
         self.hide_same_check.setChecked(self.hide_same)
         self.hide_same_check.toggled.connect(self.toggle_hide_same)
+        self.hide_same_check.setFixedHeight(30)  # 设置复选框高度
         right_option_layout.addWidget(self.hide_same_check)
         
         # 仅显示缺失复选框
         self.show_missing_check = QCheckBox("仅显示缺失")
         self.show_missing_check.setChecked(self.show_missing_only)
         self.show_missing_check.toggled.connect(self.toggle_show_missing)
+        self.show_missing_check.setFixedHeight(30)  # 设置复选框高度
         right_option_layout.addWidget(self.show_missing_check)
+        
+        # 忽略大小写复选框
+        self.ignore_case_check = QCheckBox("忽略大小写")
+        self.ignore_case_check.setChecked(self.ignore_case)
+        self.ignore_case_check.toggled.connect(self.toggle_ignore_case)
+        self.ignore_case_check.setFixedHeight(30)  # 设置复选框高度
+        right_option_layout.addWidget(self.ignore_case_check)
         
         toolbar_layout.addLayout(right_option_layout)
         parent_layout.addWidget(toolbar_frame, 0)  # 设置拉伸因子为0，工具栏不拉伸
@@ -236,6 +256,10 @@ class SQLCompareApp(QMainWindow):
         self.left_tree.verticalScrollBar().valueChanged.connect(self.sync_scroll_bars)
         self.right_tree.verticalScrollBar().valueChanged.connect(self.sync_scroll_bars)
         
+        # 连接行选择同步
+        self.left_tree.itemSelectionChanged.connect(self.sync_row_selection)
+        self.right_tree.itemSelectionChanged.connect(self.sync_row_selection)
+        
     def sync_scroll_bars(self):
         """同步滚动条"""
         if not self.sync_scroll:
@@ -246,6 +270,29 @@ class SQLCompareApp(QMainWindow):
             self.right_tree.verticalScrollBar().setValue(sender.value())
         elif sender == self.right_tree.verticalScrollBar():
             self.left_tree.verticalScrollBar().setValue(sender.value())
+            
+    def sync_row_selection(self):
+        """同步行选择"""
+        if not self.sync_row_selection_enabled:
+            return
+            
+        sender = self.sender()
+        if sender == self.left_tree:
+            # 左侧表格选择变化，同步到右侧
+            selected_rows = self.left_tree.selectedItems()
+            if selected_rows:
+                row = selected_rows[0].row()
+                self.sync_row_selection_enabled = False  # 防止循环触发
+                self.right_tree.selectRow(row)
+                self.sync_row_selection_enabled = True
+        elif sender == self.right_tree:
+            # 右侧表格选择变化，同步到左侧
+            selected_rows = self.right_tree.selectedItems()
+            if selected_rows:
+                row = selected_rows[0].row()
+                self.sync_row_selection_enabled = False  # 防止循环触发
+                self.left_tree.selectRow(row)
+                self.sync_row_selection_enabled = True
             
     def toggle_sync_scroll(self, checked):
         """切换同步滚动状态"""
@@ -260,6 +307,15 @@ class SQLCompareApp(QMainWindow):
         """切换仅显示缺失状态"""
         self.show_missing_only = checked
         self.show_differences()
+        
+    def toggle_ignore_case(self, checked):
+        """切换忽略大小写状态"""
+        self.ignore_case = checked
+        # 重新初始化SQL解析器
+        self.sql_parser = SQLParser(ignore_case=self.ignore_case)
+        # 如果已经有数据，重新比较
+        if self.left_tables and self.right_tables:
+            self.show_differences()
         
     def show_connection_dialog(self, side=None):
         """显示连接对话框"""
@@ -329,8 +385,14 @@ class SQLCompareApp(QMainWindow):
         # 执行比较
         self.show_differences()
         
+        # 启用行选择同步功能
+        self.sync_row_selection_enabled = True
+        
     def show_differences(self):
         """显示差异"""
+        # 禁用行选择同步，避免在数据加载过程中触发
+        self.sync_row_selection_enabled = False
+        
         # 清空显示区域
         self.left_tree.setRowCount(0)
         self.right_tree.setRowCount(0)
@@ -422,6 +484,9 @@ class SQLCompareApp(QMainWindow):
         # 设置差异颜色
         self.set_difference_colors(left_data, right_data, differences)
         
+        # 重新启用行选择同步
+        self.sync_row_selection_enabled = True
+        
     def fill_table(self, table, data):
         """填充表格数据"""
         table.setRowCount(len(data))
@@ -465,7 +530,15 @@ class SQLCompareApp(QMainWindow):
                     has_differences = True
                     is_missing = True
                 elif left_def != right_def:
-                    has_differences = True
+                    # 在忽略大小写模式下，需要标准化比较
+                    if self.ignore_case:
+                        from utils.util import normalize_sql_definition
+                        left_normalized = normalize_sql_definition(left_def)
+                        right_normalized = normalize_sql_definition(right_def)
+                        if left_normalized != right_normalized:
+                            has_differences = True
+                    else:
+                        has_differences = True
                 
                 # 设置颜色
                 if has_differences:

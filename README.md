@@ -2,6 +2,7 @@
 
 一个用于比较MySQL数据库表结构的图形化工具，支持文件导入和数据库连接两种方式。
 
+![截图](screenshot.png)
 ## 功能特性
 
 - 🔍 **表结构比较**: 比较两个数据源的表结构差异
@@ -11,6 +12,7 @@
 - 📊 **可视化界面**: 直观的差异显示界面
 - 🔗 **连接管理**: 保存和管理数据库连接信息
 - 📜 **历史记录**: 记录使用过的数据源
+- 🌍 **国际化支持**: 支持中英文界面切换
 
 ## 项目结构
 
@@ -22,9 +24,14 @@ dbcompare/
 │   │   ├── sql_generator.py   # SQL生成器
 │   │   └── db_connector.py    # 数据库连接器
 │   ├── ui/                # 用户界面模块
-│   │   └── connection_dialog.py # 连接管理对话框
+│   │   ├── connection_dialog.py # 连接管理对话框
+│   │   └── language_dialog.py  # 语言设置对话框
 │   ├── data/              # 数据模型和存储
 │   │   └── models.py          # 数据模型定义
+│   ├── i18n/              # 国际化模块
+│   │   ├── i18n_manager.py    # 国际化管理器
+│   │   ├── zh_CN.json         # 中文翻译文件
+│   │   └── en_US.json         # 英文翻译文件
 │   ├── utils/             # 工具函数
 │   │   └── util.py            # 通用工具函数
 │   └── main.py            # 主应用程序
@@ -38,9 +45,8 @@ dbcompare/
 │   └── deploy/            # 部署脚本
 │       └── run_mac.sh         # macOS运行脚本
 ├── config/                # 配置文件
-│   └── DBCompare.spec         # PyInstaller配置文件
-├── tests/                 # 测试文件
-│   └── test_sql_parser.py # SQL解析器测试
+│   ├── build_config.py       # 构建配置
+│   └── DBCompare.spec        # PyInstaller配置文件
 ├── docs/                  # 文档目录
 │   └── BUILD_README.md    # 构建说明文档
 ├── app.py                 # 应用程序入口
@@ -48,6 +54,8 @@ dbcompare/
 ├── requirements.txt       # 依赖包列表
 ├── setup.py              # 安装配置
 ├── pyproject.toml        # 项目配置
+├── MANIFEST.in           # 包清单文件
+├── icon.png              # 应用图标
 └── README.md             # 项目说明
 ```
 
@@ -56,6 +64,7 @@ dbcompare/
 ### 环境要求
 
 - Python 3.7+
+- PyQt6
 - MySQL Connector/Python
 - sqlparse
 
@@ -86,14 +95,9 @@ pip install -e .
 3. **开始比较**: 选择两个数据源后点击"开始比较"
 4. **查看差异**: 程序会显示表结构的差异
 5. **生成同步SQL**: 点击"生成同步SQL"获取同步语句
+6. **语言设置**: 通过"设置" -> "语言设置"切换界面语言
 
 ## 开发
-
-### 运行测试
-
-```bash
-python -m pytest tests/
-```
 
 ### 构建应用程序
 
@@ -122,6 +126,14 @@ bash scripts/deploy/run_mac.sh
 ```bash
 python setup.py build
 ```
+
+## 国际化
+
+项目支持中英文界面切换，详细说明请参考 [I18N_README.md](I18N_README.md)。
+
+## 项目结构
+
+详细的项目结构说明请参考 [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md)。
 
 ## 许可证
 

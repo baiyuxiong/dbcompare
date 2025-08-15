@@ -12,10 +12,10 @@ from PyQt6.QtWidgets import (
     QPushButton, QLabel, QComboBox, QTableWidget, QTableWidgetItem,
     QCheckBox, QFrame, QGroupBox, QSplitter, QMessageBox,
     QFileDialog, QTextEdit, QDialog, QRadioButton, QButtonGroup,
-    QGridLayout, QLineEdit, QMenuBar, QMenu
+    QGridLayout, QLineEdit, QMenuBar, QMenu, QToolBar, QToolButton
 )
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont, QColor, QClipboard, QPalette, QIcon, QAction
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QFont, QColor, QClipboard, QPalette, QIcon, QAction, QBrush, QKeySequence
 
 from core.sql_parser import SQLParser
 from core.sql_generator import SQLGenerator
@@ -39,6 +39,17 @@ class SQLCompareApp(QMainWindow):
         self.ignore_case = True  # 是否忽略大小写
         self.left_tables = {}
         self.right_tables = {}
+        
+        # 搜索相关变量
+        self.search_highlight_color = QColor(255, 255, 0, 100)  # 黄色半透明高亮
+        self.current_search_highlight_color = QColor(255, 165, 0, 150)  # 橙色半透明高亮（当前选中项）
+        self.search_timer = QTimer()
+        self.search_timer.setSingleShot(True)
+        self.search_timer.timeout.connect(self.perform_search)
+        self.current_search_text = ""
+        self.current_search_side = ""
+        self.current_search_matches = []  # 当前搜索的所有匹配项
+        self.current_search_index = -1  # 当前选中的匹配项索引
         
         # 初始化组件
         self.sql_parser = SQLParser(ignore_case=self.ignore_case)
@@ -64,6 +75,56 @@ class SQLCompareApp(QMainWindow):
         # 初始化历史记录
         self.connection_manager.update_history_display_format()
         self.update_history_lists()
+        
+        # 设置键盘快捷键
+        self.setup_keyboard_shortcuts()
+        
+        # 初始化导航按钮状态
+        self.update_navigation_buttons("left")
+        self.update_navigation_buttons("right")
+    
+    def setup_keyboard_shortcuts(self):
+        """设置键盘快捷键"""
+        # F3 - 下一个搜索结果
+        next_search_action = QAction(self)
+        next_search_action.setShortcut(QKeySequence("F3"))
+        next_search_action.triggered.connect(self.next_search_result)
+        self.addAction(next_search_action)
+        
+        # Shift+F3 - 上一个搜索结果
+        prev_search_action = QAction(self)
+        prev_search_action.setShortcut(QKeySequence("Shift+F3"))
+        prev_search_action.triggered.connect(self.previous_search_result)
+        self.addAction(prev_search_action)
+        
+        # Ctrl+F - 聚焦到搜索框
+        focus_search_action = QAction(self)
+        focus_search_action.setShortcut(QKeySequence("Ctrl+F"))
+        focus_search_action.triggered.connect(self.focus_search_input)
+        self.addAction(focus_search_action)
+    
+    def next_search_result(self):
+        """下一个搜索结果"""
+        if self.current_search_side and self.current_search_matches:
+            self.navigate_to_next_match(self.current_search_side)
+    
+    def previous_search_result(self):
+        """上一个搜索结果"""
+        if self.current_search_side and self.current_search_matches:
+            self.navigate_to_previous_match(self.current_search_side)
+    
+    def focus_search_input(self):
+        """聚焦到搜索框"""
+        if self.current_search_side == "left":
+            self.left_search_input.setFocus()
+            self.left_search_input.selectAll()
+        elif self.current_search_side == "right":
+            self.right_search_input.setFocus()
+            self.right_search_input.selectAll()
+        else:
+            # 默认聚焦到左侧搜索框
+            self.left_search_input.setFocus()
+            self.left_search_input.selectAll()
     
     def apply_windows11_style(self):
         """应用Windows 11风格样式"""
@@ -527,7 +588,7 @@ class SQLCompareApp(QMainWindow):
         # 选择框架
         select_frame = QFrame()
         select_layout = QHBoxLayout(select_frame)
-        select_layout.setSpacing(10)
+        select_layout.setSpacing(5)  # 减小间距
         
         # 连接按钮 - 固定大小
         self.left_conn_btn = QPushButton(tr("connect"))
@@ -543,7 +604,7 @@ class SQLCompareApp(QMainWindow):
         
         # 历史记录标签 - 固定大小
         history_label = QLabel(tr("history"))
-        history_label.setFixedWidth(80)
+        history_label.setFixedWidth(60)  # 减小宽度
         select_layout.addWidget(history_label)
         
         # 历史记录下拉框 - 占用剩余空间
@@ -552,6 +613,45 @@ class SQLCompareApp(QMainWindow):
             lambda text: self.on_history_select("left", text)
         )
         select_layout.addWidget(self.left_history_combo, 1)  # 设置拉伸因子为1，占用剩余空间
+        
+        # 添加间距
+        select_layout.addSpacing(20)
+        
+        # 搜索输入框
+        self.left_search_input = QLineEdit()
+        self.left_search_input.setPlaceholderText(tr("search_placeholder"))
+        self.left_search_input.setFixedHeight(30)  # 设置固定高度与按钮保持一致
+        self.left_search_input.setFixedWidth(100)  # 设置固定宽度与按钮保持一致
+        select_layout.addWidget(self.left_search_input, 1)
+        
+        # 搜索按钮
+        self.left_search_btn = QPushButton(tr("search"))
+        self.left_search_btn.setFixedWidth(60)
+        self.left_search_btn.clicked.connect(lambda: self.perform_search_click("left"))
+        select_layout.addWidget(self.left_search_btn)
+        
+        # 搜索导航按钮容器
+        left_nav_container = QFrame()
+        left_nav_layout = QVBoxLayout(left_nav_container)
+        left_nav_layout.setSpacing(0)
+        left_nav_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # 搜索导航按钮
+        self.left_prev_btn = QToolButton()
+        self.left_prev_btn.setText("▲")
+        self.left_prev_btn.setFixedSize(30, 15)
+        self.left_prev_btn.setToolTip("上一个搜索结果 (Shift+F3)")
+        self.left_prev_btn.clicked.connect(lambda: self.navigate_to_previous_match("left"))
+        left_nav_layout.addWidget(self.left_prev_btn)
+        
+        self.left_next_btn = QToolButton()
+        self.left_next_btn.setText("▼")
+        self.left_next_btn.setFixedSize(30, 15)
+        self.left_next_btn.setToolTip("下一个搜索结果 (F3)")
+        self.left_next_btn.clicked.connect(lambda: self.navigate_to_next_match("left"))
+        left_nav_layout.addWidget(self.left_next_btn)
+        
+        select_layout.addWidget(left_nav_container)
         
         left_layout.addWidget(select_frame)
         
@@ -578,7 +678,7 @@ class SQLCompareApp(QMainWindow):
         # 选择框架
         select_frame = QFrame()
         select_layout = QHBoxLayout(select_frame)
-        select_layout.setSpacing(10)
+        select_layout.setSpacing(5)  # 减小间距
         
         # 连接按钮 - 固定大小
         self.right_conn_btn = QPushButton(tr("connect"))
@@ -594,7 +694,7 @@ class SQLCompareApp(QMainWindow):
         
         # 历史记录标签 - 固定大小
         history_label = QLabel(tr("history"))
-        history_label.setFixedWidth(80)
+        history_label.setFixedWidth(60)  # 减小宽度
         select_layout.addWidget(history_label)
         
         # 历史记录下拉框 - 占用剩余空间
@@ -603,6 +703,45 @@ class SQLCompareApp(QMainWindow):
             lambda text: self.on_history_select("right", text)
         )
         select_layout.addWidget(self.right_history_combo, 1)  # 设置拉伸因子为1，占用剩余空间
+        
+        # 添加间距
+        select_layout.addSpacing(20)
+        
+        # 搜索输入框
+        self.right_search_input = QLineEdit()
+        self.right_search_input.setPlaceholderText(tr("search_placeholder"))
+        self.right_search_input.setFixedHeight(30)  # 设置固定高度与按钮保持一致
+        self.right_search_input.setFixedWidth(100)  # 设置固定宽度与按钮保持一致
+        select_layout.addWidget(self.right_search_input, 1)
+        
+        # 搜索按钮
+        self.right_search_btn = QPushButton(tr("search"))
+        self.right_search_btn.setFixedWidth(60)
+        self.right_search_btn.clicked.connect(lambda: self.perform_search_click("right"))
+        select_layout.addWidget(self.right_search_btn)
+        
+        # 搜索导航按钮容器
+        right_nav_container = QFrame()
+        right_nav_layout = QVBoxLayout(right_nav_container)
+        right_nav_layout.setSpacing(0)
+        right_nav_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # 搜索导航按钮
+        self.right_prev_btn = QToolButton()
+        self.right_prev_btn.setText("▲")
+        self.right_prev_btn.setFixedSize(30, 15)
+        self.right_prev_btn.setToolTip("上一个搜索结果 (Shift+F3)")
+        self.right_prev_btn.clicked.connect(lambda: self.navigate_to_previous_match("right"))
+        right_nav_layout.addWidget(self.right_prev_btn)
+        
+        self.right_next_btn = QToolButton()
+        self.right_next_btn.setText("▼")
+        self.right_next_btn.setFixedSize(30, 15)
+        self.right_next_btn.setToolTip("下一个搜索结果 (F3)")
+        self.right_next_btn.clicked.connect(lambda: self.navigate_to_next_match("right"))
+        right_nav_layout.addWidget(self.right_next_btn)
+        
+        select_layout.addWidget(right_nav_container)
         
         right_layout.addWidget(select_frame)
         
@@ -1081,6 +1220,206 @@ class SQLCompareApp(QMainWindow):
         self.right_history_combo.clear()
         for history in right_history:
             self.right_history_combo.addItem(history.display)
+    
+    def search_in_table(self, side, text):
+        """在表格中搜索文本"""
+        self.current_search_text = text
+        self.current_search_side = side
+        
+        # 停止之前的定时器
+        self.search_timer.stop()
+        
+        # 如果搜索文本为空，清除高亮
+        if not text.strip():
+            self.clear_search_highlight(side)
+            return
+        
+        # 启动定时器，延迟执行搜索（防抖）
+        self.search_timer.start(300)
+    
+    def perform_search(self):
+        """执行搜索"""
+        if not self.current_search_text.strip():
+            return
+            
+        side = self.current_search_side
+        text = self.current_search_text
+        
+        # 获取对应的表格
+        table = self.left_tree if side == "left" else self.right_tree
+        
+        # 清除之前的高亮
+        self.clear_search_highlight(side)
+        
+        # 搜索匹配的行
+        matched_rows = []
+        for row in range(table.rowCount()):
+            for col in range(table.columnCount()):
+                item = table.item(row, col)
+                if item:
+                    item_text = item.text()
+                    if self.ignore_case:
+                        item_text = item_text.lower()
+                        search_text = text.lower()
+                    else:
+                        search_text = text
+                    
+                    if search_text in item_text:
+                        matched_rows.append(row)
+                        break
+        
+        # 更新搜索匹配项
+        self.current_search_matches = matched_rows
+        self.current_search_index = -1
+        
+        # 高亮匹配的行
+        if matched_rows:
+            self.highlight_matched_rows(side, matched_rows)
+            # 导航到第一个匹配项
+            self.navigate_to_next_match(side)
+        else:
+            # 没有找到匹配项
+            QMessageBox.information(self, tr("search"), tr("no_search_results"))
+            # 禁用导航按钮
+            self.update_navigation_buttons(side)
+    
+    def clear_search_highlight(self, side):
+        """清除搜索高亮"""
+        table = self.left_tree if side == "left" else self.right_tree
+        
+        for row in range(table.rowCount()):
+            for col in range(table.columnCount()):
+                item = table.item(row, col)
+                if item:
+                    item.setBackground(QBrush())
+        
+        # 清除搜索状态
+        self.current_search_matches = []
+        self.current_search_index = -1
+        self.statusBar().clearMessage()
+        
+        # 更新导航按钮状态
+        self.update_navigation_buttons(side)
+    
+    def highlight_matched_rows(self, side, matched_rows):
+        """高亮匹配的行"""
+        table = self.left_tree if side == "left" else self.right_tree
+        
+        for row in matched_rows:
+            for col in range(table.columnCount()):
+                item = table.item(row, col)
+                if item:
+                    item.setBackground(self.search_highlight_color)
+    
+    def navigate_to_next_match(self, side):
+        """导航到下一个匹配项"""
+        if not self.current_search_matches:
+            return
+            
+        # 移动到下一个匹配项
+        self.current_search_index = (self.current_search_index + 1) % len(self.current_search_matches)
+        self.navigate_to_current_match(side)
+    
+    def navigate_to_previous_match(self, side):
+        """导航到上一个匹配项"""
+        if not self.current_search_matches:
+            return
+            
+        # 移动到上一个匹配项
+        self.current_search_index = (self.current_search_index - 1) % len(self.current_search_matches)
+        self.navigate_to_current_match(side)
+    
+    def navigate_to_current_match(self, side):
+        """导航到当前匹配项"""
+        if not self.current_search_matches or self.current_search_index < 0:
+            return
+            
+        table = self.left_tree if side == "left" else self.right_tree
+        current_row = self.current_search_matches[self.current_search_index]
+        
+        # 重新高亮所有匹配项，突出显示当前项
+        self.highlight_matched_rows(side, self.current_search_matches)
+        
+        # 高亮当前选中的匹配项（使用不同颜色）
+        for col in range(table.columnCount()):
+            item = table.item(current_row, col)
+            if item:
+                item.setBackground(self.current_search_highlight_color)
+        
+        # 滚动到当前匹配项
+        table.scrollToItem(table.item(current_row, 0))
+        
+        # 选中该行
+        table.selectRow(current_row)
+        
+        # 更新状态栏显示搜索信息
+        self.update_search_status(side)
+        
+        # 更新导航按钮状态
+        self.update_navigation_buttons(side)
+    
+    def update_search_status(self, side):
+        """更新搜索状态显示"""
+        if self.current_search_matches:
+            current = self.current_search_index + 1
+            total = len(self.current_search_matches)
+            status_text = tr("search_result_info").format(current=current, total=total)
+            self.statusBar().showMessage(status_text)
+        else:
+            self.statusBar().clearMessage()
+    
+    def update_navigation_buttons(self, side):
+        """更新导航按钮状态"""
+        if side == "left":
+            prev_btn = self.left_prev_btn
+            next_btn = self.left_next_btn
+        else:
+            prev_btn = self.right_prev_btn
+            next_btn = self.right_next_btn
+        
+        # 根据是否有搜索结果启用/禁用按钮
+        has_results = len(self.current_search_matches) > 0
+        prev_btn.setEnabled(has_results)
+        next_btn.setEnabled(has_results)
+    
+    def scroll_to_first_match(self, side, row):
+        """滚动到第一个匹配的行"""
+        table = self.left_tree if side == "left" else self.right_tree
+        
+        # 确保行在可视范围内
+        table.scrollToItem(table.item(row, 0))
+        
+        # 选中该行
+        table.selectRow(row)
+    
+    def perform_search_click(self, side):
+        """点击搜索按钮执行搜索"""
+        if side == "left":
+            text = self.left_search_input.text()
+        else:
+            text = self.right_search_input.text()
+        
+        # 设置当前搜索侧
+        self.current_search_side = side
+        
+        # 直接执行搜索，不使用定时器
+        self.current_search_text = text
+        
+        if not text.strip():
+            self.clear_search_highlight(side)
+            return
+        
+        # 直接执行搜索
+        self.perform_search()
+    
+    def clear_search(self, side):
+        """清除搜索"""
+        if side == "left":
+            self.left_search_input.clear()
+        else:
+            self.right_search_input.clear()
+        
+        self.clear_search_highlight(side)
             
     def on_history_select(self, side, display):
         """历史记录选择回调"""

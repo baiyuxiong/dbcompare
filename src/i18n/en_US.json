@@ -82,5 +82,10 @@
   "restart_now": "Restart Now",
   "restart_later": "Restart Later",
   "language_setting_tip": "The application will automatically restart after setting to apply the new language",
-  "language_setting_saved": "Language settings saved. The application will automatically restart to apply the new language."
+  "language_setting_saved": "Language settings saved. The application will automatically restart to apply the new language.",
+  "search": "Search",
+  "search_placeholder": "Enter search content...",
+  "clear": "Clear",
+  "no_search_results": "No matching search results found",
+  "search_result_info": "Search result: {current} of {total}"
 }

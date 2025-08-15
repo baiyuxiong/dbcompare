@@ -82,5 +82,10 @@
   "restart_now": "立即重启",
   "restart_later": "稍后重启",
   "language_setting_tip": "设置完成后会自动重启应用以应用新语言",
-  "language_setting_saved": "语言设置已保存，应用将自动重启以应用新语言。"
+  "language_setting_saved": "语言设置已保存，应用将自动重启以应用新语言。",
+  "search": "搜索",
+  "search_placeholder": "输入搜索内容...",
+  "clear": "清除",
+  "no_search_results": "未找到匹配的搜索结果",
+  "search_result_info": "搜索结果：第 {current} 项，共 {total} 项"
 }

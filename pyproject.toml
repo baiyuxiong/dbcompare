@@ -10,12 +10,13 @@ readme = "README.md"
 requires-python = ">=3.7"
 license = {text = "MIT"}
 authors = [
-    {name = "DBCompare Team"}
+    {name = "DBCompare Team", email = "baiyuxiong@gmail.com"}
 ]
-keywords = ["mysql", "database", "compare", "schema"]
+keywords = ["mysql", "database", "compare", "schema", "gui", "pyqt6"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
@@ -24,9 +25,16 @@ classifiers = [
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Database",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Utilities",
 ]
 
 dependencies = [
+    "PyQt6>=6.4.0",
+    "PyQt6-Qt6>=6.4.0",
+    "PyQt6-sip>=13.4.0",
     "mysql-connector-python>=8.0.33",
     "sqlparse>=0.4.4",
 ]
@@ -35,9 +43,10 @@ dependencies = [
 dbcompare = "app:main"
 
 [project.urls]
-Homepage = ""
-Repository = ""
-Issues = ""
+Homepage = "https://github.com/your-username/dbcompare"
+Repository = "https://github.com/your-username/dbcompare"
+Issues = "https://github.com/your-username/dbcompare/issues"
+Documentation = "https://github.com/your-username/dbcompare#readme"
 
 [tool.setuptools.packages.find]
 where = ["src"]

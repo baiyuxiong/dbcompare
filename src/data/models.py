@@ -22,6 +22,14 @@ class History:
     display: str  # display text
     last_used: datetime
 
+@dataclass
+class AppConfig:
+    id: Optional[int]
+    key: str  # 配置键
+    value: str  # 配置值
+    created_at: datetime
+    updated_at: datetime
+
 class ConnectionManager:
     def __init__(self, db_path: str = "connections.db"):
         self.db_path = db_path
@@ -48,6 +56,15 @@ class ConnectionManager:
                     value TEXT NOT NULL,
                     display TEXT NOT NULL,
                     last_used TIMESTAMP NOT NULL
+                )
+            """)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS app_config (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    key TEXT UNIQUE NOT NULL,
+                    value TEXT NOT NULL,
+                    created_at TIMESTAMP NOT NULL,
+                    updated_at TIMESTAMP NOT NULL
                 )
             """)
             conn.commit()
@@ -175,12 +192,46 @@ class ConnectionManager:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                UPDATE history 
-                SET last_used = ? 
+                UPDATE history
+                SET last_used = ?
                 WHERE id = ?
             """, (datetime.now().isoformat(), history_id))
             conn.commit()
+
+    def get_config(self, key: str, default: str = None) -> str:
+        """获取配置值"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM app_config WHERE key = ?", (key,))
+            row = cursor.fetchone()
+            return row[0] if row else default
+
+    def set_config(self, key: str, value: str):
+        """设置配置值"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            now = datetime.now().isoformat()
             
+            # 检查配置是否存在
+            cursor.execute("SELECT id FROM app_config WHERE key = ?", (key,))
+            row = cursor.fetchone()
+            
+            if row:
+                # 更新现有配置
+                cursor.execute("""
+                    UPDATE app_config
+                    SET value = ?, updated_at = ?
+                    WHERE key = ?
+                """, (value, now, key))
+            else:
+                # 创建新配置
+                cursor.execute("""
+                    INSERT INTO app_config (key, value, created_at, updated_at)
+                    VALUES (?, ?, ?, ?)
+                """, (key, value, now, now))
+            
+            conn.commit()
+
     def update_history_display_format(self):
         """更新历史记录的显示格式，添加数据库名称"""
         with sqlite3.connect(self.db_path) as conn:

@@ -5,12 +5,14 @@
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
     QPushButton, QTreeWidget, QTreeWidgetItem, QGroupBox,
-    QGridLayout, QMessageBox,  QSplitter, QSizePolicy
+    QGridLayout, QMessageBox,  QSplitter, QSizePolicy, QApplication
 )
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFont
 
 from data.models import Connection, ConnectionManager
 from datetime import datetime
+from i18n.i18n_manager import tr
 
 
 class ConnectionDialog(QDialog):
@@ -21,12 +23,207 @@ class ConnectionDialog(QDialog):
         self.connection_manager = connection_manager
         self.selected_connection = None
         
-        self.setWindowTitle("连接管理")
+        self.setWindowTitle(tr("connection_management"))
         self.setGeometry(200, 200, 900, 350)
         self.setModal(True)
+        self.center_on_screen()
+        
+        # 应用Windows 11风格样式
+        self.apply_windows11_style()
         
         self.setup_ui()
         self.load_connections()
+    
+    def center_on_screen(self):
+        """将对话框居中显示在屏幕上"""
+        app = QApplication.instance()
+        if app:
+            screen = app.primaryScreen()
+            screen_geometry = screen.availableGeometry()
+            dialog_geometry = self.geometry()
+            x = (screen_geometry.width() - dialog_geometry.width()) // 2
+            y = (screen_geometry.height() - dialog_geometry.height()) // 2
+            self.move(x, y)
+    
+    def apply_windows11_style(self):
+        """应用Windows 11风格样式"""
+        style_sheet = """
+        /* 对话框样式 */
+        QDialog {
+            background-color: #fafafa;
+            color: #202020;
+        }
+        
+        /* 按钮样式 - Windows 11风格 */
+        QPushButton {
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #ffffff, stop:1 #f8f8f8);
+            border: 1px solid #d0d0d0;
+            border-radius: 6px;
+            padding: 8px 16px;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 13px;
+            font-weight: 500;
+            color: #202020;
+            min-height: 20px;
+        }
+        
+        QPushButton:hover {
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #f0f8ff, stop:1 #e6f3ff);
+            border: 1px solid #0078d4;
+            color: #0078d4;
+        }
+        
+        QPushButton:pressed {
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #e6f3ff, stop:1 #d1e7ff);
+            border: 1px solid #106ebe;
+        }
+        
+        /* 主要操作按钮样式 */
+        QPushButton#primary {
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #0078d4, stop:1 #106ebe);
+            border: 1px solid #0078d4;
+            color: white;
+            font-weight: 600;
+        }
+        
+        QPushButton#primary:hover {
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #106ebe, stop:1 #005a9e);
+            border: 1px solid #106ebe;
+        }
+        
+        QPushButton#primary:pressed {
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #005a9e, stop:1 #004578);
+        }
+        
+        /* 输入框样式 */
+        QLineEdit {
+            border: 1px solid #d0d0d0;
+            border-radius: 6px;
+            padding: 8px 12px;
+            background: white;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 13px;
+            color: #202020;
+            min-height: 20px;
+        }
+        
+        QLineEdit:hover {
+            border: 1px solid #0078d4;
+        }
+        
+        QLineEdit:focus {
+            border: 2px solid #0078d4;
+            background: #fafafa;
+        }
+        
+        /* 树形控件样式 */
+        QTreeWidget {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 12px;
+            color: #202020;
+            gridline-color: #f0f0f0;
+        }
+        
+        QTreeWidget::item {
+            padding: 6px;
+            border: none;
+        }
+        
+        QTreeWidget::item:selected {
+            background: #e6f3ff;
+            color: #202020;
+        }
+        
+        QTreeWidget::item:hover {
+            background: #f8f9fa;
+        }
+        
+        QHeaderView::section {
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #f8f9fa, stop:1 #e9ecef);
+            border: none;
+            border-bottom: 1px solid #dee2e6;
+            padding: 10px 8px;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 12px;
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        QHeaderView::section:hover {
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #e9ecef, stop:1 #dee2e6);
+        }
+        
+        /* 分组框样式 */
+        QGroupBox {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            color: #202020;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            margin-top: 12px;
+            padding-top: 12px;
+            background: white;
+        }
+        
+        QGroupBox::title {
+            subcontrol-origin: margin;
+            left: 12px;
+            padding: 0 8px 0 8px;
+            background: white;
+        }
+        
+        /* 标签样式 */
+        QLabel {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 13px;
+            color: #202020;
+        }
+        
+        /* 分割器样式 */
+        QSplitter::handle {
+            background: #e0e0e0;
+            border-radius: 2px;
+        }
+        
+        QSplitter::handle:hover {
+            background: #0078d4;
+        }
+        
+        /* 滚动条样式 */
+        QScrollBar:vertical {
+            background: #f0f0f0;
+            width: 12px;
+            border-radius: 6px;
+        }
+        
+        QScrollBar::handle:vertical {
+            background: #c0c0c0;
+            border-radius: 6px;
+            min-height: 20px;
+        }
+        
+        QScrollBar::handle:vertical:hover {
+            background: #a0a0a0;
+        }
+        
+        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+            height: 0px;
+        }
+        """
+        
+        self.setStyleSheet(style_sheet)
         
     def setup_ui(self):
         """设置界面"""
@@ -62,7 +259,7 @@ class ConnectionDialog(QDialog):
         self.connection_tree.setColumnWidth(1, 50)
         self.connection_tree.setColumnWidth(2, 120)
         self.connection_tree.setColumnWidth(3, 120)
-        self.connection_tree.setStyleSheet("QTreeWidget::item { padding: 2px; }")
+        self.connection_tree.setStyleSheet("QTreeWidget::item { padding: 8px; }")
         self.connection_tree.itemClicked.connect(self.on_connection_selected)
         list_layout.addWidget(self.connection_tree)
         
@@ -70,11 +267,12 @@ class ConnectionDialog(QDialog):
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(10)
         
-        add_btn = QPushButton("新建")
+        add_btn = QPushButton(tr("add_connection"))
+        add_btn.setObjectName("primary")
         add_btn.clicked.connect(self.add_connection)
         btn_layout.addWidget(add_btn)
         
-        delete_btn = QPushButton("删除")
+        delete_btn = QPushButton(tr("delete_connection"))
         delete_btn.clicked.connect(self.delete_connection)
         btn_layout.addWidget(delete_btn)
         
@@ -94,7 +292,7 @@ class ConnectionDialog(QDialog):
         basic_layout.setSpacing(8)
         
         # 连接名称
-        basic_layout.addWidget(QLabel("连接名称:"), 0, 0)
+        basic_layout.addWidget(QLabel(tr("connection_name") + ":"), 0, 0)
         self.name_edit = QLineEdit()
         basic_layout.addWidget(self.name_edit, 0, 1)
         
@@ -111,34 +309,34 @@ class ConnectionDialog(QDialog):
         mysql_layout.setVerticalSpacing(2)
         
         # 主机地址
-        mysql_layout.addWidget(QLabel("主机地址:"), 0, 0)
+        mysql_layout.addWidget(QLabel(tr("host") + ":"), 0, 0)
         self.host_edit = QLineEdit()
         self.host_edit.setText("localhost")
         self.host_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         mysql_layout.addWidget(self.host_edit, 0, 1)
         
         # 端口
-        mysql_layout.addWidget(QLabel("端口:"), 1, 0)
+        mysql_layout.addWidget(QLabel(tr("port") + ":"), 1, 0)
         self.port_edit = QLineEdit()
         self.port_edit.setText("3306")
         self.port_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         mysql_layout.addWidget(self.port_edit, 1, 1)
         
         # 用户名
-        mysql_layout.addWidget(QLabel("用户名:"), 2, 0)
+        mysql_layout.addWidget(QLabel(tr("username") + ":"), 2, 0)
         self.username_edit = QLineEdit()
         self.username_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         mysql_layout.addWidget(self.username_edit, 2, 1)
         
         # 密码
-        mysql_layout.addWidget(QLabel("密码:"), 3, 0)
+        mysql_layout.addWidget(QLabel(tr("password") + ":"), 3, 0)
         self.password_edit = QLineEdit()
         self.password_edit.setEchoMode(QLineEdit.EchoMode.Password)
         self.password_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         mysql_layout.addWidget(self.password_edit, 3, 1)
         
         # 数据库名
-        mysql_layout.addWidget(QLabel("数据库名:"), 4, 0)
+        mysql_layout.addWidget(QLabel(tr("database") + ":"), 4, 0)
         self.database_edit = QLineEdit()
         self.database_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         mysql_layout.addWidget(self.database_edit, 4, 1)
@@ -150,11 +348,12 @@ class ConnectionDialog(QDialog):
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(10)
         
-        test_btn = QPushButton("测试连接")
+        test_btn = QPushButton(tr("test_connection"))
         test_btn.clicked.connect(self.test_connection)
         btn_layout.addWidget(test_btn)
         
-        save_btn = QPushButton("保存")
+        save_btn = QPushButton(tr("confirm"))
+        save_btn.setObjectName("primary")
         save_btn.clicked.connect(self.save_connection)
         btn_layout.addWidget(save_btn)
         
@@ -238,15 +437,15 @@ class ConnectionDialog(QDialog):
         database = self.database_edit.text().strip()
         
         if not name:
-            QMessageBox.warning(self, "警告", "请输入连接名称")
+            QMessageBox.warning(self, tr("warning"), tr("connection_name_required"))
             return
             
         if not host:
-            QMessageBox.warning(self, "警告", "请输入主机地址")
+            QMessageBox.warning(self, tr("warning"), tr("host_required"))
             return
             
         if not username:
-            QMessageBox.warning(self, "警告", "请输入用户名")
+            QMessageBox.warning(self, tr("warning"), tr("username_required"))
             return
             
         # 构建配置
@@ -298,13 +497,13 @@ class ConnectionDialog(QDialog):
                 self.add_connection()
                 
         except Exception as e:
-            QMessageBox.critical(self, "错误", f"保存连接失败: {str(e)}")
+            QMessageBox.critical(self, tr("error"), f"保存连接失败: {str(e)}")
         
     def delete_connection(self):
         """删除连接"""
         current_item = self.connection_tree.currentItem()
         if not current_item:
-            QMessageBox.warning(self, "警告", "请先选择要删除的连接")
+            QMessageBox.warning(self, tr("warning"), tr("please_fill_required_fields"))
             return
             
         conn_id = current_item.data(0, Qt.ItemDataRole.UserRole)
@@ -314,7 +513,7 @@ class ConnectionDialog(QDialog):
         # 确认删除
         reply = QMessageBox.question(
             self, 
-            "确认删除", 
+            tr("confirm"), 
             "确定要删除这个连接吗？",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
@@ -340,9 +539,9 @@ class ConnectionDialog(QDialog):
             conn = mysql.connector.connect(**config)
             conn.close()
             
-            QMessageBox.information(self, "成功", "MySQL数据库连接测试成功！")
+            QMessageBox.information(self, tr("info"), tr("connection_test_success"))
         except Exception as e:
-            QMessageBox.critical(self, "错误", f"MySQL数据库连接测试失败：{str(e)}")
+            QMessageBox.critical(self, tr("error"), f"{tr('connection_test_failed')}：{str(e)}")
 
 
 class SelectConnectionDialog(QDialog):
@@ -356,9 +555,153 @@ class SelectConnectionDialog(QDialog):
         self.setWindowTitle("选择连接")
         self.setGeometry(200, 200, 700, 500)
         self.setModal(True)
+        self.center_on_screen()
+        
+        # 应用Windows 11风格样式
+        self.apply_windows11_style()
         
         self.setup_ui()
         self.load_connections()
+    
+    def center_on_screen(self):
+        """将对话框居中显示在屏幕上"""
+        app = QApplication.instance()
+        if app:
+            screen = app.primaryScreen()
+            screen_geometry = screen.availableGeometry()
+            dialog_geometry = self.geometry()
+            x = (screen_geometry.width() - dialog_geometry.width()) // 2
+            y = (screen_geometry.height() - dialog_geometry.height()) // 2
+            self.move(x, y)
+    
+    def apply_windows11_style(self):
+        """应用Windows 11风格样式"""
+        style_sheet = """
+        /* 对话框样式 */
+        QDialog {
+            background-color: #fafafa;
+            color: #202020;
+        }
+        
+        /* 按钮样式 - Windows 11风格 */
+        QPushButton {
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #ffffff, stop:1 #f8f8f8);
+            border: 1px solid #d0d0d0;
+            border-radius: 6px;
+            padding: 8px 16px;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 13px;
+            font-weight: 500;
+            color: #202020;
+            min-height: 20px;
+        }
+        
+        QPushButton:hover {
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #f0f8ff, stop:1 #e6f3ff);
+            border: 1px solid #0078d4;
+            color: #0078d4;
+        }
+        
+        QPushButton:pressed {
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #e6f3ff, stop:1 #d1e7ff);
+            border: 1px solid #106ebe;
+        }
+        
+        /* 主要操作按钮样式 */
+        QPushButton#primary {
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #0078d4, stop:1 #106ebe);
+            border: 1px solid #0078d4;
+            color: white;
+            font-weight: 600;
+        }
+        
+        QPushButton#primary:hover {
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #106ebe, stop:1 #005a9e);
+            border: 1px solid #106ebe;
+        }
+        
+        QPushButton#primary:pressed {
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #005a9e, stop:1 #004578);
+        }
+        
+        /* 树形控件样式 */
+        QTreeWidget {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 12px;
+            color: #202020;
+            gridline-color: #f0f0f0;
+        }
+        
+        QTreeWidget::item {
+            padding: 6px;
+            border: none;
+        }
+        
+        QTreeWidget::item:selected {
+            background: #e6f3ff;
+            color: #202020;
+        }
+        
+        QTreeWidget::item:hover {
+            background: #f8f9fa;
+        }
+        
+        QHeaderView::section {
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #f8f9fa, stop:1 #e9ecef);
+            border: none;
+            border-bottom: 1px solid #dee2e6;
+            padding: 10px 8px;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 12px;
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        QHeaderView::section:hover {
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #e9ecef, stop:1 #dee2e6);
+        }
+        
+        /* 标签样式 */
+        QLabel {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 13px;
+            color: #202020;
+        }
+        
+        /* 滚动条样式 */
+        QScrollBar:vertical {
+            background: #f0f0f0;
+            width: 12px;
+            border-radius: 6px;
+        }
+        
+        QScrollBar::handle:vertical {
+            background: #c0c0c0;
+            border-radius: 6px;
+            min-height: 20px;
+        }
+        
+        QScrollBar::handle:vertical:hover {
+            background: #a0a0a0;
+        }
+        
+        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+            height: 0px;
+        }
+        """
+        
+        self.setStyleSheet(style_sheet)
         
     def setup_ui(self):
         """设置界面"""
@@ -367,17 +710,17 @@ class SelectConnectionDialog(QDialog):
         layout.setContentsMargins(20, 20, 20, 20)
         
         # 标题
-        title_label = QLabel("请选择数据库连接")
+        title_label = QLabel(tr("select_sql_file"))  # 使用现有的翻译键
         layout.addWidget(title_label)
         
         # 连接列表
         self.connection_tree = QTreeWidget()
-        self.connection_tree.setHeaderLabels(["名称", "类型", "主机", "数据库名"])
+        self.connection_tree.setHeaderLabels([tr("connection_name"), tr("connection_type"), tr("host"), tr("database")])
         self.connection_tree.setColumnWidth(0, 200)
         self.connection_tree.setColumnWidth(1, 100)
         self.connection_tree.setColumnWidth(2, 150)
         self.connection_tree.setColumnWidth(3, 120)
-        self.connection_tree.setStyleSheet("QTreeWidget::item { padding: 2px; }")
+        self.connection_tree.setStyleSheet("QTreeWidget::item { padding: 8px; }")
         self.connection_tree.itemDoubleClicked.connect(self.on_connection_double_clicked)
         layout.addWidget(self.connection_tree)
         
@@ -385,11 +728,12 @@ class SelectConnectionDialog(QDialog):
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
         
-        select_btn = QPushButton("选择")
+        select_btn = QPushButton(tr("confirm"))
+        select_btn.setObjectName("primary")
         select_btn.clicked.connect(self.accept)
         btn_layout.addWidget(select_btn)
         
-        cancel_btn = QPushButton("取消")
+        cancel_btn = QPushButton(tr("cancel"))
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
         

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=DBCompare
+Comment=MySQL表结构比较工具
+Exec=/Users/baiyuxiong/code/dbcompare/dist/DBCompare.app/Contents/MacOS/DBCompare
+Icon=/Users/baiyuxiong/code/dbcompare/icon.png
+Terminal=false
+Categories=Development;Database;

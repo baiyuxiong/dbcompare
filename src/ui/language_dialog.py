@@ -206,53 +206,9 @@ class LanguageDialog(QDialog):
                 tr("language_setting_saved")
             )
             
-            # 重启应用
-            self.restart_application()
+            # 关闭对话框
+            self.accept()
         else:
             self.accept()
     
-    def restart_application(self):
-        """重启应用程序"""
-        import sys
-        import os
-        import subprocess
-        import time
-        
-        try:
-            # 获取当前脚本路径
-            if getattr(sys, 'frozen', False):
-                # 如果是打包后的应用
-                app_path = sys.executable
-                args = sys.argv[1:]
-            else:
-                # 如果是开发环境
-                app_path = sys.executable
-                script_path = os.path.abspath(sys.argv[0])
-                args = [script_path] + sys.argv[1:]
-            
-            print(f"重启应用: {app_path}")
-            print(f"参数: {args}")
-            
-            # 使用更简单可靠的方法
-            if os.name == 'nt':  # Windows
-                # Windows: 使用start命令
-                cmd = f'start "" "{app_path}"'
-                if args:
-                    cmd += ' ' + ' '.join(f'"{arg}"' for arg in args)
-                os.system(cmd)
-            else:  # macOS/Linux
-                # Unix系统: 使用后台启动
-                cmd = [app_path] + args
-                subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            
-            # 等待一小段时间确保新进程启动
-            time.sleep(0.5)
-            
-            # 退出当前应用
-            from PyQt6.QtWidgets import QApplication
-            QApplication.quit()
-            
-        except Exception as e:
-            print(f"重启应用失败: {e}")
-            # 如果重启失败，至少关闭对话框
-            self.accept()
+    # 移除 restart_application 方法

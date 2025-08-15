@@ -75,7 +75,6 @@ def build_executable():
             "--onefile",  # 打包成单个文件
             "--windowed",  # 无控制台窗口
             "--name=DBCompare",  # 可执行文件名称
-            "--icon=icon.png" if os.path.exists("icon.png") else "",
             "--add-data=src/i18n:src/i18n",  # 添加国际化文件
             "--add-data=icon.png:." if os.path.exists("icon.png") else "",
             "--hidden-import=PyQt6",

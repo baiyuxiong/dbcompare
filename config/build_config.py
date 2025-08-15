@@ -40,24 +40,27 @@ BUILD_CONFIG = {
     ],
 }
 
+# 统一图标配置
+ICON_CONFIG = {
+    "icon_file": "icon.png",  # 统一使用PNG格式
+    "icon_path": PROJECT_ROOT / "icon.png",
+}
+
 # 平台特定配置
 PLATFORM_CONFIG = {
     "win": {
         "onefile": True,
         "console": False,
-        "icon": "icon.ico",
         "add_data_separator": ";",
     },
     "mac": {
         "onefile": False,
         "console": False,
-        "icon": None,
         "add_data_separator": ":",
     },
     "linux": {
         "onefile": True,
         "console": True,
-        "icon": None,
         "add_data_separator": ":",
     },
 }

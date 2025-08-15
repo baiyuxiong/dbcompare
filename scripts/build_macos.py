@@ -75,7 +75,6 @@ def build_executable():
             "--onedir",  # macOS通常使用目录模式
             "--windowed",  # 无控制台窗口
             "--name=DBCompare",  # 可执行文件名称
-            "--icon=icon.icns" if os.path.exists("icon.icns") else "",
             "--add-data=src/i18n:src/i18n",  # 添加国际化文件（macOS使用冒号分隔）
             "--add-data=icon.png:." if os.path.exists("icon.png") else "",
             "--hidden-import=PyQt6",

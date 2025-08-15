@@ -43,10 +43,10 @@ dependencies = [
 dbcompare = "app:main"
 
 [project.urls]
-Homepage = "https://github.com/your-username/dbcompare"
-Repository = "https://github.com/your-username/dbcompare"
-Issues = "https://github.com/your-username/dbcompare/issues"
-Documentation = "https://github.com/your-username/dbcompare#readme"
+Homepage = "https://github.com/baiyuxiong/dbcompare"
+Repository = "https://github.com/baiyuxiong/dbcompare"
+Issues = "https://github.com/baiyuxiong/dbcompare/issues"
+Documentation = "https://github.com/baiyuxiong/dbcompare#readme"
 
 [tool.setuptools.packages.find]
 where = ["src"]

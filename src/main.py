@@ -17,14 +17,14 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont, QColor, QClipboard, QPalette, QIcon, QAction, QBrush, QKeySequence
 
-from core.sql_parser import SQLParser
-from core.sql_generator import SQLGenerator
-from core.db_connector import DBConnector
-from data.models import ConnectionManager, Connection, History
-from ui.connection_dialog import ConnectionDialog, SelectConnectionDialog
-from ui.language_dialog import LanguageDialog
-from i18n.i18n_manager import get_i18n_manager, tr
-from utils.icon_manager import setup_window_icon, setup_application_icon
+from src.core.sql_parser import SQLParser
+from src.core.sql_generator import SQLGenerator
+from src.core.db_connector import DBConnector
+from src.data.models import ConnectionManager, Connection, History
+from src.ui.connection_dialog import ConnectionDialog, SelectConnectionDialog
+from src.ui.language_dialog import LanguageDialog
+from src.i18n.i18n_manager import get_i18n_manager, tr
+from src.utils.icon_manager import setup_window_icon, setup_application_icon
 
 class SQLCompareApp(QMainWindow):
     """MySQL表结构比较工具主窗口"""
@@ -430,8 +430,7 @@ class SQLCompareApp(QMainWindow):
         
         self.setStyleSheet(style_sheet)
         
-        # 设置窗口图标和属性
-        setup_window_icon(self)
+        # 窗口图标已在主函数中设置，这里不需要重复设置
         
         # 设置字体
         app = QApplication.instance()
@@ -456,15 +455,9 @@ class SQLCompareApp(QMainWindow):
     def show_language_dialog(self):
         """显示语言设置对话框"""
         dialog = LanguageDialog(self)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            # 语言已更改，需要重启应用
-            self.restart_application()
+        dialog.exec()
     
-    def restart_application(self):
-        """重启应用程序"""
-        QApplication.quit()
-        # 重新启动应用
-        os.execv(sys.executable, ['python'] + sys.argv)
+    # 移除 restart_application 方法
 
     def create_ui(self):
         """创建用户界面"""
@@ -1791,12 +1784,12 @@ def main():
     app.setApplicationVersion("2.0.0")
     app.setOrganizationName("DBCompare")
     
-    # 设置应用图标
-    setup_application_icon(app)
-    
     # 创建主窗口
     window = SQLCompareApp()
+    
+    # 设置应用和窗口图标
     setup_window_icon(window)
+    
     window.show()
     
     # 运行应用

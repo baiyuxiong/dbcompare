@@ -27,7 +27,6 @@ def get_platform_config(platform_name):
         "windows": {
             "onefile": True,
             "console": False,
-            "icon": "icon.ico",
             "add_data_separator": ";",
             "exe_name": "DBCompare.exe",
             "bundle_name": "DBCompare.exe"
@@ -35,7 +34,6 @@ def get_platform_config(platform_name):
         "macos": {
             "onefile": False,
             "console": False,
-            "icon": "icon.icns",
             "add_data_separator": ":",
             "exe_name": "DBCompare",
             "bundle_name": "DBCompare.app"
@@ -43,7 +41,6 @@ def get_platform_config(platform_name):
         "linux": {
             "onefile": True,
             "console": False,
-            "icon": "icon.png",
             "add_data_separator": ":",
             "exe_name": "DBCompare",
             "bundle_name": "DBCompare"
@@ -100,6 +97,7 @@ def generate_spec_content(platform_name):
         'utils',
         'src.utils',
         'src.utils.util',
+        'src.utils.icon_manager',
         # 标准库
         'threading',
         'datetime',
@@ -175,7 +173,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='{config["icon"]}' if os.path.exists('{config["icon"]}') else None,
+    icon='icon.png' if os.path.exists('icon.png') else None,
 )
 '''
     
@@ -187,7 +185,7 @@ exe = EXE(
 app = BUNDLE(
     exe,
     name='{config["bundle_name"]}',
-    icon='{config["icon"]}' if os.path.exists('{config["icon"]}') else None,
+    icon='icon.png' if os.path.exists('icon.png') else None,
     bundle_identifier='com.dbcompare.app',
     info_plist={{
         'CFBundleName': 'DBCompare',
@@ -229,7 +227,7 @@ def main():
     config = get_platform_config(platform_name)
     print(f"\n平台配置详情:")
     print(f"  可执行文件: {config['exe_name']}")
-    print(f"  图标文件: {config['icon']}")
+    print(f"  图标文件: icon.png")
     print(f"  单文件模式: {config['onefile']}")
     print(f"  控制台窗口: {config['console']}")
     

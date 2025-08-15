@@ -1,9 +1,125 @@
 # DBCompare - MySQL表结构比较工具
 
+[English](#english) | [中文](#chinese)
+
+---
+
+## English
+
+A graphical tool for comparing MySQL database table structures, supporting both file import and database connection methods.
+
+![Screenshot](screenshot.png)
+
+### Features
+
+- 🔍 **Table Structure Comparison**: Compare table structure differences between two data sources
+- 📁 **File Support**: Import SQL files for analysis
+- 🗄️ **Database Connection**: Direct connection to MySQL databases
+- 🔄 **Sync SQL Generation**: Automatically generate SQL statements for synchronizing table structures
+- 📊 **Visual Interface**: Intuitive difference display interface
+- 🔗 **Connection Management**: Save and manage database connection information
+- 📜 **History Records**: Record used data sources
+- 🌍 **Internationalization**: Support for Chinese and English interface switching
+
+### Requirements
+
+- Python 3.7+
+- PyQt6
+- MySQL Connector/Python
+- sqlparse
+
+### Installation
+
+#### Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+#### Run the Application
+
+```bash
+python app.py
+```
+
+#### Development Installation
+
+```bash
+pip install -e .
+```
+
+### Usage
+
+1. **Start the Application**: Run `python app.py`
+2. **Select Data Sources**: 
+   - Click "Connect" button to connect to database
+   - Click "File" button to select SQL file
+3. **Start Comparison**: After selecting two data sources, click "Start Comparison"
+4. **View Differences**: The application will display table structure differences
+5. **Generate Sync SQL**: Click "Generate Sync SQL" to get synchronization statements
+6. **Language Settings**: Switch interface language via "Settings" -> "Language Settings"
+
+### Development
+
+#### Build the Application
+
+```bash
+# Quick build (recommended)
+python build.py
+
+# Platform-specific build
+bash scripts/build_macos.py    # macOS
+bash scripts/build_linux.py    # Linux
+python scripts/build_windows.py # Windows
+```
+
+### Project Structure
+
+```
+dbcompare/
+├── src/                    # Source code directory
+│   ├── core/              # Core functionality modules
+│   │   ├── sql_parser.py      # SQL parser
+│   │   ├── sql_generator.py   # SQL generator
+│   │   └── db_connector.py    # Database connector
+│   ├── ui/                # User interface modules
+│   │   ├── connection_dialog.py # Connection management dialog
+│   │   └── language_dialog.py  # Language settings dialog
+│   ├── data/              # Data models and storage
+│   │   └── models.py          # Data model definitions
+│   ├── i18n/              # Internationalization module
+│   │   ├── i18n_manager.py    # Internationalization manager
+│   │   ├── zh_CN.json         # Chinese translation file
+│   │   └── en_US.json         # English translation file
+│   ├── utils/             # Utility functions
+│   │   └── util.py            # Common utility functions
+│   └── main.py            # Main application
+├── scripts/               # Build and deployment scripts
+├── config/                # Configuration files
+├── app.py                 # Application entry point
+├── requirements.txt       # Dependency package list
+├── setup.py              # Installation configuration
+├── pyproject.toml        # Project configuration
+└── README.md             # Project description
+```
+
+### License
+
+MIT License
+
+### Contributing
+
+Welcome to submit Issues and Pull Requests!
+
+---
+
+## Chinese
+
 一个用于比较MySQL数据库表结构的图形化工具，支持文件导入和数据库连接两种方式。
 
 ![截图](screenshot.png)
-## 功能特性
+
+### 功能特性
 
 - 🔍 **表结构比较**: 比较两个数据源的表结构差异
 - 📁 **文件支持**: 支持导入SQL文件进行分析
@@ -14,7 +130,59 @@
 - 📜 **历史记录**: 记录使用过的数据源
 - 🌍 **国际化支持**: 支持中英文界面切换
 
-## 项目结构
+### 环境要求
+
+- Python 3.7+
+- PyQt6
+- MySQL Connector/Python
+- sqlparse
+
+### 安装和运行
+
+#### 安装依赖
+
+```bash
+pip install -r requirements.txt
+```
+
+#### 运行程序
+
+```bash
+python app.py
+```
+
+#### 开发安装
+
+```bash
+pip install -e .
+```
+
+### 使用方法
+
+1. **启动程序**: 运行 `python app.py`
+2. **选择数据源**: 
+   - 点击"连接"按钮连接数据库
+   - 点击"文件"按钮选择SQL文件
+3. **开始比较**: 选择两个数据源后点击"开始比较"
+4. **查看差异**: 程序会显示表结构的差异
+5. **生成同步SQL**: 点击"生成同步SQL"获取同步语句
+6. **语言设置**: 通过"设置" -> "语言设置"切换界面语言
+
+### 开发
+
+#### 构建应用程序
+
+```bash
+# 快速构建（推荐）
+python build.py
+
+# 平台特定构建
+python scripts/build_macos.py    # macOS
+python scripts/build_linux.py    # Linux
+python scripts/build_windows.py  # Windows
+```
+
+### 项目结构
 
 ```
 dbcompare/
@@ -36,109 +204,18 @@ dbcompare/
 │   │   └── util.py            # 通用工具函数
 │   └── main.py            # 主应用程序
 ├── scripts/               # 构建和部署脚本
-│   ├── build/             # 构建脚本
-│   │   ├── build.py           # Python构建脚本
-│   │   ├── build_with_spec.py # 高级构建脚本
-│   │   ├── build_macos.sh     # macOS构建脚本
-│   │   ├── build_linux.sh     # Linux构建脚本
-│   │   └── build_windows.bat  # Windows构建脚本
-│   └── deploy/            # 部署脚本
-│       └── run_mac.sh         # macOS运行脚本
 ├── config/                # 配置文件
-│   ├── build_config.py       # 构建配置
-│   └── DBCompare.spec        # PyInstaller配置文件
-├── docs/                  # 文档目录
-│   └── BUILD_README.md    # 构建说明文档
 ├── app.py                 # 应用程序入口
-├── build.py               # 构建脚本入口
 ├── requirements.txt       # 依赖包列表
 ├── setup.py              # 安装配置
 ├── pyproject.toml        # 项目配置
-├── MANIFEST.in           # 包清单文件
-├── icon.png              # 应用图标
 └── README.md             # 项目说明
 ```
 
-## 安装和运行
-
-### 环境要求
-
-- Python 3.7+
-- PyQt6
-- MySQL Connector/Python
-- sqlparse
-
-### 安装依赖
-
-```bash
-pip install -r requirements.txt
-```
-
-### 运行程序
-
-```bash
-python app.py
-```
-
-### 开发安装
-
-```bash
-pip install -e .
-```
-
-## 使用方法
-
-1. **启动程序**: 运行 `python app.py`
-2. **选择数据源**: 
-   - 点击"连接"按钮连接数据库
-   - 点击"文件"按钮选择SQL文件
-3. **开始比较**: 选择两个数据源后点击"开始比较"
-4. **查看差异**: 程序会显示表结构的差异
-5. **生成同步SQL**: 点击"生成同步SQL"获取同步语句
-6. **语言设置**: 通过"设置" -> "语言设置"切换界面语言
-
-## 开发
-
-### 构建应用程序
-
-```bash
-# 快速构建（推荐）
-python build.py
-
-# 平台特定构建
-bash scripts/build/build_macos.sh    # macOS
-bash scripts/build/build_linux.sh    # Linux
-scripts/build/build_windows.bat      # Windows
-
-# 高级构建选项
-python scripts/build/build_with_spec.py --help
-```
-
-### 运行构建后的应用程序
-
-```bash
-# macOS
-bash scripts/deploy/run_mac.sh
-```
-
-### 开发构建
-
-```bash
-python setup.py build
-```
-
-## 国际化
-
-项目支持中英文界面切换，详细说明请参考 [I18N_README.md](I18N_README.md)。
-
-## 项目结构
-
-详细的项目结构说明请参考 [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md)。
-
-## 许可证
+### 许可证
 
 MIT License
 
-## 贡献
+### 贡献
 
 欢迎提交Issue和Pull Request！ 

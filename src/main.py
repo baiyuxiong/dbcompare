@@ -62,10 +62,12 @@ class SQLCompareApp(QMainWindow):
         self.i18n_manager = get_i18n_manager(self.connection_manager)
         
         self.setWindowTitle(tr("app_title"))
-        self.showMaximized()
         
         # 应用Windows 11风格样式
         self.apply_windows11_style()
+        
+        # 设置窗口最大化 - 在样式应用后执行
+        self.showMaximized()
         
         # 创建菜单栏
         self.create_menu_bar()

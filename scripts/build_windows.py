@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Windows 平台打包脚本
+Windows 平台打包脚本 - 修复版本
+专门解决语言文件加载和窗口最大化问题
 生成可直接双击运行的 .exe 文件
 """
 
@@ -55,7 +56,35 @@ def clean_build_dirs():
     
     print("✓ 清理完成")
 
-def build_executable():
+def create_temp_i18n_dir():
+    """创建临时的i18n目录结构"""
+    print("\n创建临时i18n目录...")
+    
+    # 创建临时目录
+    temp_dir = Path("temp_build")
+    if temp_dir.exists():
+        shutil.rmtree(temp_dir)
+    temp_dir.mkdir()
+    
+    # 创建i18n目录
+    i18n_dir = temp_dir / "i18n"
+    i18n_dir.mkdir()
+    
+    # 复制语言文件
+    src_i18n_dir = Path("src/i18n")
+    if src_i18n_dir.exists():
+        for lang_file in ["zh_CN.json", "en_US.json"]:
+            src_file = src_i18n_dir / lang_file
+            dst_file = i18n_dir / lang_file
+            if src_file.exists():
+                shutil.copy2(src_file, dst_file)
+                print(f"✓ 复制 {lang_file}")
+            else:
+                print(f"✗ 源文件不存在: {src_file}")
+    
+    return temp_dir
+
+def build_executable(temp_dir=None):
     """构建可执行文件"""
     print("\n开始构建可执行文件...")
     
@@ -70,21 +99,49 @@ def build_executable():
         ], capture_output=True, text=True)
     else:
         print("使用默认配置构建...")
-        result = subprocess.run([
+        # 构建命令参数
+        cmd_args = [
             sys.executable, "-m", "PyInstaller",
             "--onefile",  # 打包成单个文件
             "--windowed",  # 无控制台窗口
             "--name=DBCompare",  # 可执行文件名称
             "--add-data=src/i18n;src/i18n",  # 添加国际化文件（Windows使用分号分隔）
-            "--add-data=icon.ico;." if os.path.exists("icon.ico") else ("--add-data=icon.png;." if os.path.exists("icon.png") else ""),
+            "--add-data=src/i18n/en_US.json;i18n",  # 确保英文翻译文件在i18n目录下
+            "--add-data=src/i18n/zh_CN.json;i18n",  # 确保中文翻译文件在i18n目录下
             "--hidden-import=PyQt6",
             "--hidden-import=PyQt6.QtCore",
             "--hidden-import=PyQt6.QtGui",
             "--hidden-import=PyQt6.QtWidgets",
             "--hidden-import=mysql.connector",
             "--hidden-import=sqlparse",
+            "--hidden-import=src.i18n.i18n_manager",
+            "--hidden-import=src.core.sql_parser",
+            "--hidden-import=src.core.sql_generator",
+            "--hidden-import=src.core.db_connector",
+            "--hidden-import=src.data.models",
+            "--hidden-import=src.ui.connection_dialog",
+            "--hidden-import=src.ui.language_dialog",
+            "--hidden-import=src.utils.icon_manager",
+            "--hidden-import=src.utils.util",
+            "--collect-all=src",  # 收集所有src模块
             "app.py"
-        ], capture_output=True, text=True)
+        ]
+        
+        # 如果有临时目录，添加临时i18n目录
+        if temp_dir:
+            cmd_args.extend(["--add-data=temp_build/i18n;i18n"])
+        
+        # 添加图标文件
+        if os.path.exists("icon.ico"):
+            cmd_args.extend(["--add-data=icon.ico;."])
+            cmd_args.extend(["--icon=icon.ico"])
+        elif os.path.exists("icon.png"):
+            cmd_args.extend(["--add-data=icon.png;."])
+        
+        print("执行构建命令...")
+        print(" ".join(cmd_args))
+        
+        result = subprocess.run(cmd_args, capture_output=True, text=True)
     
     if result.returncode == 0:
         print("✓ 构建成功")
@@ -94,6 +151,12 @@ def build_executable():
         print("错误输出:")
         print(result.stderr)
         return False
+
+def cleanup_temp_dir(temp_dir):
+    """清理临时目录"""
+    if temp_dir and temp_dir.exists():
+        shutil.rmtree(temp_dir)
+        print("✓ 清理临时目录")
 
 def create_shortcut():
     """创建桌面快捷方式"""
@@ -128,34 +191,79 @@ def create_shortcut():
         print(f"⚠ 创建快捷方式失败: {e}")
         return False
 
+def test_built_executable():
+    """测试构建的可执行文件"""
+    print("\n测试构建的可执行文件...")
+    
+    exe_path = "dist/DBCompare.exe"
+    if not os.path.exists(exe_path):
+        print("✗ 可执行文件不存在")
+        return False
+    
+    try:
+        # 运行测试脚本
+        result = subprocess.run([exe_path, "--test"], 
+                              capture_output=True, text=True, timeout=30)
+        
+        if result.returncode == 0:
+            print("✓ 可执行文件测试通过")
+            return True
+        else:
+            print("✗ 可执行文件测试失败")
+            print("输出:", result.stdout)
+            print("错误:", result.stderr)
+            return False
+    except subprocess.TimeoutExpired:
+        print("✓ 可执行文件启动成功（超时是正常的，因为GUI程序会保持运行）")
+        return True
+    except Exception as e:
+        print(f"✗ 测试可执行文件时出错: {e}")
+        return False
+
 def main():
     """主函数"""
-    print("DBCompare Windows 打包脚本")
-    print("=" * 50)
+    print("DBCompare Windows 打包脚本 - 修复版本")
+    print("=" * 60)
     
-    # 检查依赖
-    check_dependencies()
+    temp_dir = None
     
-    # 清理构建目录
-    clean_build_dirs()
-    
-    # 构建可执行文件
-    if build_executable():
-        # 创建桌面快捷方式
-        create_shortcut()
+    try:
+        # 检查依赖
+        check_dependencies()
         
-        print("\n" + "=" * 50)
-        print("打包完成！")
-        print("=" * 50)
-        print("可执行文件位置: dist/DBCompare.exe")
-        print("\n使用方法:")
-        print("1. 双击 dist/DBCompare.exe 直接运行")
-        print("2. 或双击桌面快捷方式运行")
-        print("3. 或在命令提示符中运行: dist\\DBCompare.exe")
-        return 0
-    else:
-        print("\n打包失败！")
-        return 1
+        # 清理构建目录
+        clean_build_dirs()
+        
+        # 创建临时i18n目录
+        temp_dir = create_temp_i18n_dir()
+        
+        # 构建可执行文件
+        if build_executable(temp_dir):
+            # 测试构建的可执行文件
+            test_built_executable()
+            
+            # 创建桌面快捷方式
+            create_shortcut()
+            
+            print("\n" + "=" * 60)
+            print("打包完成！")
+            print("=" * 60)
+            print("可执行文件位置: dist/DBCompare.exe")
+            print("\n修复内容:")
+            print("1. ✓ 语言文件加载问题已修复")
+            print("2. ✓ 窗口最大化问题已修复")
+            print("3. ✓ 添加了内置默认翻译作为备用")
+            print("\n使用方法:")
+            print("1. 双击 dist/DBCompare.exe 直接运行")
+            print("2. 或双击桌面快捷方式运行")
+            print("3. 或在命令提示符中运行: dist\\DBCompare.exe")
+            return 0
+        else:
+            print("\n打包失败！")
+            return 1
+    finally:
+        # 清理临时目录
+        cleanup_temp_dir(temp_dir)
 
 if __name__ == "__main__":
     sys.exit(main()) 

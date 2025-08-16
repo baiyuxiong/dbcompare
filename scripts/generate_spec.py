@@ -57,7 +57,7 @@ def generate_spec_content(platform_name):
     datas = [
         # 图标文件 - 根据平台选择
         ('icon.ico', '.') if platform_name == "windows" and os.path.exists('icon.ico') else ('icon.png', '.'),
-        # 国际化文件
+        # 国际化文件 - 确保在i18n目录下
         ('src/i18n/en_US.json', 'i18n'),
         ('src/i18n/zh_CN.json', 'i18n'),
         # 其他资源文件

@@ -55,8 +55,8 @@ def generate_spec_content(platform_name):
     
     # 数据文件
     datas = [
-        # 图标文件
-        ('icon.png', '.'),
+        # 图标文件 - 根据平台选择
+        ('icon.ico', '.') if platform_name == "windows" and os.path.exists('icon.ico') else ('icon.png', '.'),
         # 国际化文件
         ('src/i18n/en_US.json', 'i18n'),
         ('src/i18n/zh_CN.json', 'i18n'),
@@ -173,7 +173,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='icon.png' if os.path.exists('icon.png') else None,
+    icon='icon.ico' if os.path.exists('icon.ico') else ('icon.png' if os.path.exists('icon.png') else None),
 )
 '''
     
@@ -185,7 +185,7 @@ exe = EXE(
 app = BUNDLE(
     exe,
     name='{config["bundle_name"]}',
-    icon='icon.png' if os.path.exists('icon.png') else None,
+    icon='icon.ico' if os.path.exists('icon.ico') else ('icon.png' if os.path.exists('icon.png') else None),
     bundle_identifier='com.dbcompare.app',
     info_plist={{
         'CFBundleName': 'DBCompare',
@@ -227,7 +227,7 @@ def main():
     config = get_platform_config(platform_name)
     print(f"\n平台配置详情:")
     print(f"  可执行文件: {config['exe_name']}")
-    print(f"  图标文件: icon.png")
+    print(f"  图标文件: {'icon.ico' if platform_name == 'windows' and os.path.exists('icon.ico') else 'icon.png'}")
     print(f"  单文件模式: {config['onefile']}")
     print(f"  控制台窗口: {config['console']}")
     

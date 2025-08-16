@@ -76,7 +76,7 @@ def build_executable():
             "--windowed",  # 无控制台窗口
             "--name=DBCompare",  # 可执行文件名称
             "--add-data=src/i18n;src/i18n",  # 添加国际化文件（Windows使用分号分隔）
-            "--add-data=icon.png;." if os.path.exists("icon.png") else "",
+            "--add-data=icon.ico;." if os.path.exists("icon.ico") else ("--add-data=icon.png;." if os.path.exists("icon.png") else ""),
             "--hidden-import=PyQt6",
             "--hidden-import=PyQt6.QtCore",
             "--hidden-import=PyQt6.QtGui",

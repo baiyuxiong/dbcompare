@@ -239,6 +239,7 @@ class ConnectionManager:
             return row[0] if row else default
 
     def set_config(self, key: str, value: str):
+        print(f"set_config: {key} = {value}")
         """设置配置值"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()

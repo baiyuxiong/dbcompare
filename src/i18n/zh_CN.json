@@ -84,5 +84,14 @@
   "search_placeholder": "输入搜索内容...",
   "clear": "清除",
   "no_search_results": "未找到匹配的搜索结果",
-  "search_result_info": "搜索结果：第 {current} 项，共 {total} 项"
+  "search_result_info": "搜索结果：第 {current} 项，共 {total} 项",
+  "about": "关于",
+  "help": "帮助",
+  "about_title": "DB Compare 表结构比较工具",
+  "about_version": "版本 1.0.0",
+  "about_company": "西安立方网络科技有限公司",
+  "about_website": "https://lifang.biz",
+  "about_email": "i@lifang.biz",
+  "about_copyright": "© 2024 西安立方网络科技有限公司. 保留所有权利。",
+  "about_close": "关闭"
 }

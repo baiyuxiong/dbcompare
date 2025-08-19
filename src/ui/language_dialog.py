@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 
-from i18n.i18n_manager import get_i18n_manager, tr
+from src.i18n.i18n_manager import get_i18n_manager, tr
 
 
 class LanguageDialog(QDialog):
@@ -17,8 +17,10 @@ class LanguageDialog(QDialog):
     
     def __init__(self, parent=None):
         super().__init__(parent)
+
         self.i18n_manager = get_i18n_manager()
         self.original_language = self.i18n_manager.get_language()
+        print("LanguageDialog: original_language",self.original_language)
         
         self.setWindowTitle(tr("language_settings"))
         self.setModal(True)

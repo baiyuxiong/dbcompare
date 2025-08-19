@@ -158,5 +158,6 @@ Thumbs.db
 
 # Application specific
 *.spec
+DBCompare.desktop
 build/
 dist/

@@ -23,13 +23,14 @@ from src.core.db_connector import DBConnector
 from src.data.models import ConnectionManager, Connection, History
 from src.ui.connection_dialog import ConnectionDialog, SelectConnectionDialog
 from src.ui.language_dialog import LanguageDialog
+from src.ui.about_dialog import AboutDialog
 from src.i18n.i18n_manager import get_i18n_manager, tr
 from src.utils.icon_manager import setup_window_icon, setup_application_icon
 
 class SQLCompareApp(QMainWindow):
     """MySQL表结构比较工具主窗口"""
     
-    def __init__(self):
+    def __init__(self, connection_manager):
         super().__init__()
         
         # 初始化变量
@@ -53,21 +54,23 @@ class SQLCompareApp(QMainWindow):
         self.current_search_index = -1  # 当前选中的匹配项索引
         
         # 初始化组件
-        self.sql_parser = SQLParser(ignore_case=self.ignore_case)
-        self.sql_generator = SQLGenerator()
-        self.db_connector = DBConnector()
-        self.connection_manager = ConnectionManager()
+        self.connection_manager = connection_manager
+        # 延迟初始化其他组件，避免阻塞UI
+        self.sql_parser = None
+        self.sql_generator = None
+        self.db_connector = None
         
-        # 初始化国际化管理器
-        self.i18n_manager = get_i18n_manager(self.connection_manager)
+        # 获取已初始化的国际化管理器实例
+        self.i18n_manager = get_i18n_manager()
         
         self.setWindowTitle(tr("app_title"))
         
-        # 应用Windows 11风格样式
-        self.apply_windows11_style()
+        # 设置窗口初始大小和位置
+        self.setMinimumSize(1200, 800)  # 设置最小尺寸
+        self.resize(1400, 900)  # 设置初始大小
         
-        # 设置窗口最大化 - 在样式应用后执行
-        self.showMaximized()
+        # 延迟应用样式，避免阻塞UI
+        QTimer.singleShot(50, self.apply_windows11_style)
         
         # 创建菜单栏
         self.create_menu_bar()
@@ -75,16 +78,12 @@ class SQLCompareApp(QMainWindow):
         # 创建界面
         self.create_ui()
         
-        # 初始化历史记录
-        self.connection_manager.update_history_display_format()
-        self.update_history_lists()
-        
         # 设置键盘快捷键
         self.setup_keyboard_shortcuts()
         
-        # 初始化导航按钮状态
-        self.update_navigation_buttons("left")
-        self.update_navigation_buttons("right")
+        # 使用定时器延迟初始化其他组件，避免阻塞UI
+        QTimer.singleShot(50, self.delayed_ui_initialization)
+        QTimer.singleShot(100, self.delayed_initialization)
     
     def setup_keyboard_shortcuts(self):
         """设置键盘快捷键"""
@@ -128,6 +127,36 @@ class SQLCompareApp(QMainWindow):
             # 默认聚焦到左侧搜索框
             self.left_search_input.setFocus()
             self.left_search_input.selectAll()
+    
+    def delayed_ui_initialization(self):
+        """延迟UI初始化"""
+        # 初始化导航按钮状态
+        self.update_navigation_buttons("left")
+        self.update_navigation_buttons("right")
+    
+    def delayed_initialization(self):
+        """延迟初始化，避免阻塞UI线程"""
+        # 初始化组件
+        if self.sql_parser is None:
+            self.sql_parser = SQLParser(ignore_case=self.ignore_case)
+        if self.sql_generator is None:
+            self.sql_generator = SQLGenerator()
+        if self.db_connector is None:
+            self.db_connector = DBConnector()
+        
+        # 在后台线程中执行耗时的数据库操作
+        def init_history():
+            try:
+                # 更新历史记录显示格式
+                self.connection_manager.update_history_display_format()
+                # 在主线程中更新UI
+                QTimer.singleShot(0, self.update_history_lists)
+            except Exception as e:
+                print(f"初始化历史记录时出错: {e}")
+        
+        # 启动后台线程
+        thread = threading.Thread(target=init_history, daemon=True)
+        thread.start()
     
     def apply_windows11_style(self):
         """应用Windows 11风格样式"""
@@ -453,10 +482,23 @@ class SQLCompareApp(QMainWindow):
         language_action = QAction(tr("language_settings"), self)
         language_action.triggered.connect(self.show_language_dialog)
         settings_menu.addAction(language_action)
+        
+        # 帮助菜单
+        help_menu = menubar.addMenu(tr("help"))
+        
+        # 关于菜单项
+        about_action = QAction(tr("about"), self)
+        about_action.triggered.connect(self.show_about_dialog)
+        help_menu.addAction(about_action)
     
     def show_language_dialog(self):
         """显示语言设置对话框"""
         dialog = LanguageDialog(self)
+        dialog.exec()
+    
+    def show_about_dialog(self):
+        """显示关于对话框"""
+        dialog = AboutDialog(self)
         dialog.exec()
     
     # 移除 restart_application 方法
@@ -585,13 +627,13 @@ class SQLCompareApp(QMainWindow):
         # 连接按钮 - 固定大小
         self.left_conn_btn = QPushButton(tr("connect"))
         self.left_conn_btn.clicked.connect(lambda: self.show_connection_dialog("left"))
-        self.left_conn_btn.setFixedWidth(60)
+        self.left_conn_btn.setFixedWidth(100)
         select_layout.addWidget(self.left_conn_btn)
         
         # 文件按钮 - 固定大小
         self.left_file_btn = QPushButton(tr("file"))
         self.left_file_btn.clicked.connect(lambda: self.select_file("left"))
-        self.left_file_btn.setFixedWidth(60)
+        self.left_file_btn.setFixedWidth(100)
         select_layout.addWidget(self.left_file_btn)
         
         # 历史记录标签 - 固定大小
@@ -618,7 +660,7 @@ class SQLCompareApp(QMainWindow):
         
         # 搜索按钮
         self.left_search_btn = QPushButton(tr("search"))
-        self.left_search_btn.setFixedWidth(60)
+        self.left_search_btn.setFixedWidth(80)
         self.left_search_btn.clicked.connect(lambda: self.perform_search_click("left"))
         select_layout.addWidget(self.left_search_btn)
         
@@ -675,13 +717,13 @@ class SQLCompareApp(QMainWindow):
         # 连接按钮 - 固定大小
         self.right_conn_btn = QPushButton(tr("connect"))
         self.right_conn_btn.clicked.connect(lambda: self.show_connection_dialog("right"))
-        self.right_conn_btn.setFixedWidth(60)
+        self.right_conn_btn.setFixedWidth(100)
         select_layout.addWidget(self.right_conn_btn)
         
         # 文件按钮 - 固定大小
         self.right_file_btn = QPushButton(tr("file"))
         self.right_file_btn.clicked.connect(lambda: self.select_file("right"))
-        self.right_file_btn.setFixedWidth(60)
+        self.right_file_btn.setFixedWidth(100)
         select_layout.addWidget(self.right_file_btn)
         
         # 历史记录标签 - 固定大小
@@ -708,7 +750,7 @@ class SQLCompareApp(QMainWindow):
         
         # 搜索按钮
         self.right_search_btn = QPushButton(tr("search"))
-        self.right_search_btn.setFixedWidth(60)
+        self.right_search_btn.setFixedWidth(80)
         self.right_search_btn.clicked.connect(lambda: self.perform_search_click("right"))
         select_layout.addWidget(self.right_search_btn)
         
@@ -875,7 +917,7 @@ class SQLCompareApp(QMainWindow):
         left_display = self.left_history_combo.currentText()
         right_display = self.right_history_combo.currentText()
         
-        if not left_display or not right_display:
+        if not left_display or not right_display or left_display.strip() == "" or right_display.strip() == "":
             QMessageBox.warning(self, tr("warning"), tr("please_select_two_data_sources"))
             return
             
@@ -1205,11 +1247,15 @@ class SQLCompareApp(QMainWindow):
         
         # 更新左侧历史记录列表
         self.left_history_combo.clear()
+        # 添加一个空选项作为默认选择
+        self.left_history_combo.addItem("")
         for history in left_history:
             self.left_history_combo.addItem(history.display)
             
         # 更新右侧历史记录列表
         self.right_history_combo.clear()
+        # 添加一个空选项作为默认选择
+        self.right_history_combo.addItem("")
         for history in right_history:
             self.right_history_combo.addItem(history.display)
     
@@ -1415,7 +1461,7 @@ class SQLCompareApp(QMainWindow):
             
     def on_history_select(self, side, display):
         """历史记录选择回调"""
-        if not display:
+        if not display or display.strip() == "":
             return
             
         # 获取历史记录
@@ -1781,18 +1827,28 @@ def main():
     """主函数"""
     app = QApplication(sys.argv)
     
+    # 初始化国际化管理器 - 在应用启动时就开始初始化
+    from src.data.models import ConnectionManager
+    connection_manager = ConnectionManager()
+    # 使用已导入的get_i18n_manager函数，避免重复导入
+    get_i18n_manager(connection_manager)
+    
     # 设置应用信息
     app.setApplicationName(tr("app_title"))
-    app.setApplicationVersion("2.0.0")
+    app.setApplicationVersion("1.0.0")
     app.setOrganizationName("DBCompare")
     
-    # 创建主窗口
-    window = SQLCompareApp()
+    # 创建主窗口，传入已创建的connection_manager
+    window = SQLCompareApp(connection_manager)
     
     # 设置应用和窗口图标
     setup_window_icon(window)
     
+    # 先显示窗口
     window.show()
+    
+    # 使用定时器延迟最大化，确保窗口完全初始化后再最大化
+    QTimer.singleShot(100, window.showMaximized)
     
     # 运行应用
     sys.exit(app.exec())

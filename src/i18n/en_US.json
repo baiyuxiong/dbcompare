@@ -84,5 +84,14 @@
   "search_placeholder": "Enter search content...",
   "clear": "Clear",
   "no_search_results": "No matching search results found",
-  "search_result_info": "Search result: {current} of {total}"
+  "search_result_info": "Search result: {current} of {total}",
+  "about": "About",
+  "help": "Help",
+  "about_title": "DB Compare Table Structure Comparison Tool",
+  "about_version": "Version 1.0.0",
+  "about_company": "Xi'an Lifang Network Technology Co., Ltd.",
+  "about_website": "https://lifang.biz",
+  "about_email": "i@lifang.biz",
+  "about_copyright": "© 2024 Xi'an Lifang Network Technology Co., Ltd. All rights reserved.",
+  "about_close": "Close"
 }

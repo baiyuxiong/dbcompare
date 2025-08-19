@@ -12,7 +12,7 @@ from PyQt6.QtGui import QFont
 
 from data.models import Connection, ConnectionManager
 from datetime import datetime
-from i18n.i18n_manager import tr
+from src.i18n.i18n_manager import tr
 
 
 class ConnectionDialog(QDialog):

@@ -258,6 +258,247 @@ class SQLiteSQLGenerator(BaseSQLGenerator):
                 
         return "\n".join(sql_statements)
 
+class OracleSQLGenerator(BaseSQLGenerator):
+    """
+    Oracle SQL生成器
+    用于生成Oracle数据库之间的结构同步SQL
+    """
+    
+    def __init__(self):
+        super().__init__('oracle')
+    
+    def generate_sync_sql(self, left_tables, right_tables):
+        """生成Oracle同步SQL语句"""
+        sql_statements = []
+        
+        # 获取表结构差异
+        differences = self.parser.compare_tables(left_tables, right_tables)
+        
+        # 处理新增的表
+        for table_name in differences['added_tables']:
+            sql_statements.append(f"-- 创建新表: {table_name}")
+            sql_statements.append(right_tables[table_name]['raw_sql'])
+            sql_statements.append("")
+            
+        # 处理删除的表
+        for table_name in differences['removed_tables']:
+            sql_statements.append(f"-- 删除表: {table_name}")
+            sql_statements.append(f"DROP TABLE {table_name};")
+            sql_statements.append("")
+            
+        # 处理修改的表
+        for table_name, changes in differences['modified_tables'].items():
+            sql_statements.append(f"-- 修改表: {table_name}")
+            
+            # 添加新列
+            if 'columns' in changes and 'added_columns' in changes['columns']:
+                for col_name, col_def in changes['columns']['added_columns'].items():
+                    sql_statements.append(
+                        f"ALTER TABLE {table_name} ADD {col_name} {col_def};"
+                    )
+                
+            # 删除列
+            if 'columns' in changes and 'removed_columns' in changes['columns']:
+                for col_name in changes['columns']['removed_columns']:
+                    sql_statements.append(
+                        f"ALTER TABLE {table_name} DROP COLUMN {col_name};"
+                    )
+                
+            # 修改列
+            if 'columns' in changes and 'modified_columns' in changes['columns']:
+                for col_name, col_changes in changes['columns']['modified_columns'].items():
+                    right_def = col_changes['raw']['right']
+                    # Oracle的MODIFY语法
+                    sql_statements.append(
+                        f"ALTER TABLE {table_name} MODIFY {col_name} {right_def};"
+                    )
+            
+            sql_statements.append("")
+                
+        return "\n".join(sql_statements)
+
+class SQLServerSQLGenerator(BaseSQLGenerator):
+    """
+    SQL Server SQL生成器
+    用于生成SQL Server数据库之间的结构同步SQL
+    """
+    
+    def __init__(self):
+        super().__init__('sqlserver')
+    
+    def generate_sync_sql(self, left_tables, right_tables):
+        """生成SQL Server同步SQL语句"""
+        sql_statements = []
+        
+        # 获取表结构差异
+        differences = self.parser.compare_tables(left_tables, right_tables)
+        
+        # 处理新增的表
+        for table_name in differences['added_tables']:
+            sql_statements.append(f"-- 创建新表: {table_name}")
+            sql_statements.append(right_tables[table_name]['raw_sql'])
+            sql_statements.append("")
+            
+        # 处理删除的表
+        for table_name in differences['removed_tables']:
+            sql_statements.append(f"-- 删除表: {table_name}")
+            sql_statements.append(f"DROP TABLE {table_name};")
+            sql_statements.append("")
+            
+        # 处理修改的表
+        for table_name, changes in differences['modified_tables'].items():
+            sql_statements.append(f"-- 修改表: {table_name}")
+            
+            # 添加新列
+            if 'columns' in changes and 'added_columns' in changes['columns']:
+                for col_name, col_def in changes['columns']['added_columns'].items():
+                    sql_statements.append(
+                        f"ALTER TABLE [{table_name}] ADD [{col_name}] {col_def};"
+                    )
+                
+            # 删除列
+            if 'columns' in changes and 'removed_columns' in changes['columns']:
+                for col_name in changes['columns']['removed_columns']:
+                    sql_statements.append(
+                        f"ALTER TABLE [{table_name}] DROP COLUMN [{col_name}];"
+                    )
+                
+            # 修改列
+            if 'columns' in changes and 'modified_columns' in changes['columns']:
+                for col_name, col_changes in changes['columns']['modified_columns'].items():
+                    right_def = col_changes['raw']['right']
+                    sql_statements.append(
+                        f"ALTER TABLE [{table_name}] ALTER COLUMN [{col_name}] {right_def};"
+                    )
+            
+            sql_statements.append("")
+                
+        return "\n".join(sql_statements)
+
+class MongoDBSQLGenerator(BaseSQLGenerator):
+    """
+    MongoDB SQL生成器
+    注意：MongoDB是NoSQL数据库，不使用传统SQL
+    此生成器提供MongoDB集合结构比较信息
+    """
+    
+    def __init__(self):
+        super().__init__('mongodb')
+    
+    def generate_sync_sql(self, left_tables, right_tables):
+        """生成MongoDB同步信息"""
+        statements = []
+        
+        statements.append("-- MongoDB是NoSQL数据库，不使用SQL")
+        statements.append("-- 以下是集合（Collection）结构差异信息：")
+        statements.append("")
+        
+        # 获取集合结构差异
+        differences = self.parser.compare_tables(left_tables, right_tables)
+        
+        # 处理新增的集合
+        for collection_name in differences['added_tables']:
+            statements.append(f"-- 新增集合: {collection_name}")
+            statements.append(f"db.createCollection('{collection_name}')")
+            
+        # 处理删除的集合
+        for collection_name in differences['removed_tables']:
+            statements.append(f"-- 删除集合: {collection_name}")
+            statements.append(f"db.{collection_name}.drop()")
+            
+        # 处理修改的集合
+        for collection_name, changes in differences['modified_tables'].items():
+            statements.append(f"-- 集合 {collection_name} 有结构变化")
+            statements.append(f"-- 请手动检查文档结构并进行相应调整")
+                
+        return "\n".join(statements)
+
+class Db2SQLGenerator(BaseSQLGenerator):
+    """
+    IBM Db2 SQL生成器
+    用于生成Db2数据库之间的结构同步SQL
+    """
+    
+    def __init__(self):
+        super().__init__('db2')
+    
+    def generate_sync_sql(self, left_tables, right_tables):
+        """生成Db2同步SQL语句"""
+        sql_statements = []
+        
+        # 获取表结构差异
+        differences = self.parser.compare_tables(left_tables, right_tables)
+        
+        # 处理新增的表
+        for table_name in differences['added_tables']:
+            sql_statements.append(f"-- 创建新表: {table_name}")
+            sql_statements.append(right_tables[table_name]['raw_sql'])
+            sql_statements.append("")
+            
+        # 处理删除的表
+        for table_name in differences['removed_tables']:
+            sql_statements.append(f"-- 删除表: {table_name}")
+            sql_statements.append(f"DROP TABLE {table_name};")
+            sql_statements.append("")
+            
+        # 处理修改的表
+        for table_name, changes in differences['modified_tables'].items():
+            sql_statements.append(f"-- 修改表: {table_name}")
+            
+            # 添加新列
+            if 'columns' in changes and 'added_columns' in changes['columns']:
+                for col_name, col_def in changes['columns']['added_columns'].items():
+                    sql_statements.append(
+                        f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_def};"
+                    )
+                
+            # 删除列
+            if 'columns' in changes and 'removed_columns' in changes['columns']:
+                for col_name in changes['columns']['removed_columns']:
+                    sql_statements.append(
+                        f"ALTER TABLE {table_name} DROP COLUMN {col_name};"
+                    )
+                
+            # 修改列（Db2的特殊语法）
+            if 'columns' in changes and 'modified_columns' in changes['columns']:
+                for col_name, col_changes in changes['columns']['modified_columns'].items():
+                    right_def = col_changes['raw']['right']
+                    
+                    # 提取类型信息
+                    type_part = self._extract_column_type(right_def)
+                    if type_part:
+                        sql_statements.append(
+                            f"ALTER TABLE {table_name} ALTER COLUMN {col_name} SET DATA TYPE {type_part};"
+                        )
+                    
+                    # 处理NOT NULL约束
+                    if 'NOT NULL' in right_def.upper():
+                        sql_statements.append(
+                            f"ALTER TABLE {table_name} ALTER COLUMN {col_name} SET NOT NULL;"
+                        )
+                    elif 'NULL' in right_def.upper():
+                        sql_statements.append(
+                            f"ALTER TABLE {table_name} ALTER COLUMN {col_name} DROP NOT NULL;"
+                        )
+                    
+                    # 处理默认值
+                    default_value = extract_default_value_enhanced(right_def)
+                    if default_value:
+                        sql_statements.append(
+                            f"ALTER TABLE {table_name} ALTER COLUMN {col_name} SET DEFAULT {default_value};"
+                        )
+            
+            sql_statements.append("")
+                
+        return "\n".join(sql_statements)
+    
+    def _extract_column_type(self, col_def: str) -> str:
+        """从列定义中提取类型部分"""
+        parts = col_def.split()
+        if parts:
+            return parts[0]
+        return None
+
 class SQLGenerator:
     """
     SQL生成器工厂类
@@ -269,8 +510,11 @@ class SQLGenerator:
         self.generators = {
             'mysql': MySQLSQLGenerator(),
             'postgresql': PostgreSQLSQLGenerator(),
+            'oracle': OracleSQLGenerator(),
+            'sqlserver': SQLServerSQLGenerator(),
             'sqlite': SQLiteSQLGenerator(),
-            # 可以根据需要添加其他数据库生成器
+            'mongodb': MongoDBSQLGenerator(),
+            'db2': Db2SQLGenerator()
         }
         
     def generate_sync_sql(self, left_tables, right_tables, db_type="mysql"):

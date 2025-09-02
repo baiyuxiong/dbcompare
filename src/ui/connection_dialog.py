@@ -5,7 +5,8 @@
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
     QPushButton, QTreeWidget, QTreeWidgetItem, QGroupBox,
-    QGridLayout, QMessageBox,  QSplitter, QSizePolicy, QApplication
+    QGridLayout, QMessageBox,  QSplitter, QSizePolicy, QApplication,
+    QComboBox, QFileDialog
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
@@ -33,6 +34,9 @@ class ConnectionDialog(QDialog):
         
         self.setup_ui()
         self.load_connections()
+        
+        # 初始化时显示MySQL配置，隐藏PostgreSQL配置
+        self.on_database_type_changed("MySQL")
     
     def center_on_screen(self):
         """将对话框居中显示在屏幕上"""
@@ -296,6 +300,19 @@ class ConnectionDialog(QDialog):
         self.name_edit = QLineEdit()
         basic_layout.addWidget(self.name_edit, 0, 1)
         
+        # 数据库类型选择
+        basic_layout.addWidget(QLabel(tr("database_type") + ":"), 1, 0)
+        self.type_combo = QComboBox()
+        self.type_combo.addItem("MySQL", "mysql")
+        self.type_combo.addItem("PostgreSQL", "postgresql")
+        self.type_combo.addItem("Oracle", "oracle")
+        self.type_combo.addItem("SQL Server", "sqlserver")
+        self.type_combo.addItem("SQLite", "sqlite")
+        self.type_combo.addItem("MongoDB", "mongodb")
+        self.type_combo.addItem("IBM Db2", "db2")
+        self.type_combo.currentTextChanged.connect(self.on_database_type_changed)
+        basic_layout.addWidget(self.type_combo, 1, 1)
+        
         details_layout.addLayout(basic_layout)
         
         # MySQL配置
@@ -344,6 +361,259 @@ class ConnectionDialog(QDialog):
         # 设置列拉伸
         # mysql_layout.setColumnStretch(1, 1)
         
+        # PostgreSQL配置
+        postgresql_group = QGroupBox("PostgreSQL配置")
+        postgresql_group.setStyleSheet("QGroupBox { padding: 8px; }")
+        postgresql_group.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        details_layout.addWidget(postgresql_group)
+        
+        postgresql_layout = QGridLayout(postgresql_group)
+        postgresql_layout.setSpacing(4)
+        postgresql_layout.setVerticalSpacing(2)
+        
+        # 主机地址
+        postgresql_layout.addWidget(QLabel(tr("host") + ":"), 0, 0)
+        self.pg_host_edit = QLineEdit()
+        self.pg_host_edit.setText("localhost")
+        self.pg_host_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        postgresql_layout.addWidget(self.pg_host_edit, 0, 1)
+        
+        # 端口
+        postgresql_layout.addWidget(QLabel(tr("port") + ":"), 1, 0)
+        self.pg_port_edit = QLineEdit()
+        self.pg_port_edit.setText("5432")
+        self.pg_port_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        postgresql_layout.addWidget(self.pg_port_edit, 1, 1)
+        
+        # 用户名
+        postgresql_layout.addWidget(QLabel(tr("username") + ":"), 2, 0)
+        self.pg_username_edit = QLineEdit()
+        self.pg_username_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        postgresql_layout.addWidget(self.pg_username_edit, 2, 1)
+        
+        # 密码
+        postgresql_layout.addWidget(QLabel(tr("password") + ":"), 3, 0)
+        self.pg_password_edit = QLineEdit()
+        self.pg_password_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self.pg_password_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        postgresql_layout.addWidget(self.pg_password_edit, 3, 1)
+        
+        # 数据库名
+        postgresql_layout.addWidget(QLabel(tr("database") + ":"), 4, 0)
+        self.pg_database_edit = QLineEdit()
+        self.pg_database_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        postgresql_layout.addWidget(self.pg_database_edit, 4, 1)
+        
+        # 设置列拉伸
+        # postgresql_layout.setColumnStretch(1, 1)
+        
+        # Oracle配置
+        oracle_group = QGroupBox("Oracle配置")
+        oracle_group.setStyleSheet("QGroupBox { padding: 8px; }")
+        oracle_group.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        details_layout.addWidget(oracle_group)
+        
+        oracle_layout = QGridLayout(oracle_group)
+        oracle_layout.setSpacing(4)
+        oracle_layout.setVerticalSpacing(2)
+        
+        # 主机地址
+        oracle_layout.addWidget(QLabel(tr("host") + ":"), 0, 0)
+        self.oracle_host_edit = QLineEdit()
+        self.oracle_host_edit.setText("localhost")
+        self.oracle_host_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        oracle_layout.addWidget(self.oracle_host_edit, 0, 1)
+        
+        # 端口
+        oracle_layout.addWidget(QLabel(tr("port") + ":"), 1, 0)
+        self.oracle_port_edit = QLineEdit()
+        self.oracle_port_edit.setText("1521")
+        self.oracle_port_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        oracle_layout.addWidget(self.oracle_port_edit, 1, 1)
+        
+        # 用户名
+        oracle_layout.addWidget(QLabel(tr("username") + ":"), 2, 0)
+        self.oracle_username_edit = QLineEdit()
+        self.oracle_username_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        oracle_layout.addWidget(self.oracle_username_edit, 2, 1)
+        
+        # 密码
+        oracle_layout.addWidget(QLabel(tr("password") + ":"), 3, 0)
+        self.oracle_password_edit = QLineEdit()
+        self.oracle_password_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self.oracle_password_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        oracle_layout.addWidget(self.oracle_password_edit, 3, 1)
+        
+        # 服务名/SID
+        oracle_layout.addWidget(QLabel(tr("service_name") + "/SID:"), 4, 0)
+        self.oracle_service_edit = QLineEdit()
+        self.oracle_service_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        oracle_layout.addWidget(self.oracle_service_edit, 4, 1)
+        
+        # SQL Server配置
+        sqlserver_group = QGroupBox("SQL Server配置")
+        sqlserver_group.setStyleSheet("QGroupBox { padding: 8px; }")
+        sqlserver_group.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        details_layout.addWidget(sqlserver_group)
+        
+        sqlserver_layout = QGridLayout(sqlserver_group)
+        sqlserver_layout.setSpacing(4)
+        sqlserver_layout.setVerticalSpacing(2)
+        
+        # 主机地址
+        sqlserver_layout.addWidget(QLabel(tr("host") + ":"), 0, 0)
+        self.sqlserver_host_edit = QLineEdit()
+        self.sqlserver_host_edit.setText("localhost")
+        self.sqlserver_host_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        sqlserver_layout.addWidget(self.sqlserver_host_edit, 0, 1)
+        
+        # 端口
+        sqlserver_layout.addWidget(QLabel(tr("port") + ":"), 1, 0)
+        self.sqlserver_port_edit = QLineEdit()
+        self.sqlserver_port_edit.setText("1433")
+        self.sqlserver_port_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        sqlserver_layout.addWidget(self.sqlserver_port_edit, 1, 1)
+        
+        # 用户名
+        sqlserver_layout.addWidget(QLabel(tr("username") + ":"), 2, 0)
+        self.sqlserver_username_edit = QLineEdit()
+        self.sqlserver_username_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        sqlserver_layout.addWidget(self.sqlserver_username_edit, 2, 1)
+        
+        # 密码
+        sqlserver_layout.addWidget(QLabel(tr("password") + ":"), 3, 0)
+        self.sqlserver_password_edit = QLineEdit()
+        self.sqlserver_password_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self.sqlserver_password_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        sqlserver_layout.addWidget(self.sqlserver_password_edit, 3, 1)
+        
+        # 数据库名
+        sqlserver_layout.addWidget(QLabel(tr("database") + ":"), 4, 0)
+        self.sqlserver_database_edit = QLineEdit()
+        self.sqlserver_database_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        sqlserver_layout.addWidget(self.sqlserver_database_edit, 4, 1)
+        
+        # 驱动
+        sqlserver_layout.addWidget(QLabel(tr("driver") + ":"), 5, 0)
+        self.sqlserver_driver_edit = QLineEdit()
+        self.sqlserver_driver_edit.setText("ODBC Driver 17 for SQL Server")
+        self.sqlserver_driver_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        sqlserver_layout.addWidget(self.sqlserver_driver_edit, 5, 1)
+        
+        # SQLite配置
+        sqlite_group = QGroupBox("SQLite配置")
+        sqlite_group.setStyleSheet("QGroupBox { padding: 8px; }")
+        sqlite_group.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        details_layout.addWidget(sqlite_group)
+        
+        sqlite_layout = QGridLayout(sqlite_group)
+        sqlite_layout.setSpacing(4)
+        sqlite_layout.setVerticalSpacing(2)
+        
+        # 数据库文件
+        sqlite_layout.addWidget(QLabel(tr("database_file") + ":"), 0, 0)
+        self.sqlite_file_edit = QLineEdit()
+        self.sqlite_file_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        sqlite_layout.addWidget(self.sqlite_file_edit, 0, 1)
+        
+        # 浏览按钮
+        self.sqlite_browse_btn = QPushButton(tr("browse"))
+        self.sqlite_browse_btn.clicked.connect(self.browse_sqlite_file)
+        sqlite_layout.addWidget(self.sqlite_browse_btn, 0, 2)
+        
+        # MongoDB配置
+        mongodb_group = QGroupBox("MongoDB配置")
+        mongodb_group.setStyleSheet("QGroupBox { padding: 8px; }")
+        mongodb_group.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        details_layout.addWidget(mongodb_group)
+        
+        mongodb_layout = QGridLayout(mongodb_group)
+        mongodb_layout.setSpacing(4)
+        mongodb_layout.setVerticalSpacing(2)
+        
+        # 主机地址
+        mongodb_layout.addWidget(QLabel(tr("host") + ":"), 0, 0)
+        self.mongodb_host_edit = QLineEdit()
+        self.mongodb_host_edit.setText("localhost")
+        self.mongodb_host_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        mongodb_layout.addWidget(self.mongodb_host_edit, 0, 1)
+        
+        # 端口
+        mongodb_layout.addWidget(QLabel(tr("port") + ":"), 1, 0)
+        self.mongodb_port_edit = QLineEdit()
+        self.mongodb_port_edit.setText("27017")
+        self.mongodb_port_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        mongodb_layout.addWidget(self.mongodb_port_edit, 1, 1)
+        
+        # 用户名
+        mongodb_layout.addWidget(QLabel(tr("username") + ":"), 2, 0)
+        self.mongodb_username_edit = QLineEdit()
+        self.mongodb_username_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        mongodb_layout.addWidget(self.mongodb_username_edit, 2, 1)
+        
+        # 密码
+        mongodb_layout.addWidget(QLabel(tr("password") + ":"), 3, 0)
+        self.mongodb_password_edit = QLineEdit()
+        self.mongodb_password_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self.mongodb_password_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        mongodb_layout.addWidget(self.mongodb_password_edit, 3, 1)
+        
+        # 数据库名
+        mongodb_layout.addWidget(QLabel(tr("database") + ":"), 4, 0)
+        self.mongodb_database_edit = QLineEdit()
+        self.mongodb_database_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        mongodb_layout.addWidget(self.mongodb_database_edit, 4, 1)
+        
+        # 认证源
+        mongodb_layout.addWidget(QLabel(tr("auth_source") + ":"), 5, 0)
+        self.mongodb_auth_source_edit = QLineEdit()
+        self.mongodb_auth_source_edit.setText("admin")
+        self.mongodb_auth_source_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        mongodb_layout.addWidget(self.mongodb_auth_source_edit, 5, 1)
+        
+        # Db2配置
+        db2_group = QGroupBox("IBM Db2配置")
+        db2_group.setStyleSheet("QGroupBox { padding: 8px; }")
+        db2_group.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        details_layout.addWidget(db2_group)
+        
+        db2_layout = QGridLayout(db2_group)
+        db2_layout.setSpacing(4)
+        db2_layout.setVerticalSpacing(2)
+        
+        # 主机地址
+        db2_layout.addWidget(QLabel(tr("host") + ":"), 0, 0)
+        self.db2_host_edit = QLineEdit()
+        self.db2_host_edit.setText("localhost")
+        self.db2_host_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        db2_layout.addWidget(self.db2_host_edit, 0, 1)
+        
+        # 端口
+        db2_layout.addWidget(QLabel(tr("port") + ":"), 1, 0)
+        self.db2_port_edit = QLineEdit()
+        self.db2_port_edit.setText("50000")
+        self.db2_port_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        db2_layout.addWidget(self.db2_port_edit, 1, 1)
+        
+        # 用户名
+        db2_layout.addWidget(QLabel(tr("username") + ":"), 2, 0)
+        self.db2_username_edit = QLineEdit()
+        self.db2_username_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        db2_layout.addWidget(self.db2_username_edit, 2, 1)
+        
+        # 密码
+        db2_layout.addWidget(QLabel(tr("password") + ":"), 3, 0)
+        self.db2_password_edit = QLineEdit()
+        self.db2_password_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self.db2_password_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        db2_layout.addWidget(self.db2_password_edit, 3, 1)
+        
+        # 数据库名
+        db2_layout.addWidget(QLabel(tr("database") + ":"), 4, 0)
+        self.db2_database_edit = QLineEdit()
+        self.db2_database_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        db2_layout.addWidget(self.db2_database_edit, 4, 1)
+        
         # 操作按钮
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(10)
@@ -361,8 +631,54 @@ class ConnectionDialog(QDialog):
         
         # 添加弹性空间，让元素靠上排列
         details_layout.addStretch()
+    
+    def browse_sqlite_file(self):
+        """浏览SQLite数据库文件"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            tr("select_sqlite_file"),
+            "",
+            tr("sqlite_files") + ";;" + tr("all_files")
+        )
+        if file_path:
+            self.sqlite_file_edit.setText(file_path)
         
-
+    def on_database_type_changed(self, text):
+        """数据库类型改变时的处理"""
+        # 隐藏所有配置组
+        for child in self.findChildren(QGroupBox):
+            if "配置" in child.title():
+                child.setVisible(False)
+        
+        # 根据选择的类型显示相应的配置组
+        if text == "MySQL":
+            for child in self.findChildren(QGroupBox):
+                if "MySQL" in child.title():
+                    child.setVisible(True)
+        elif text == "PostgreSQL":
+            for child in self.findChildren(QGroupBox):
+                if "PostgreSQL" in child.title():
+                    child.setVisible(True)
+        elif text == "Oracle":
+            for child in self.findChildren(QGroupBox):
+                if "Oracle" in child.title():
+                    child.setVisible(True)
+        elif text == "SQL Server":
+            for child in self.findChildren(QGroupBox):
+                if "SQL Server" in child.title():
+                    child.setVisible(True)
+        elif text == "SQLite":
+            for child in self.findChildren(QGroupBox):
+                if "SQLite" in child.title():
+                    child.setVisible(True)
+        elif text == "MongoDB":
+            for child in self.findChildren(QGroupBox):
+                if "MongoDB" in child.title():
+                    child.setVisible(True)
+        elif text == "IBM Db2":
+            for child in self.findChildren(QGroupBox):
+                if "IBM Db2" in child.title():
+                    child.setVisible(True)
         
     def load_connections(self):
         """加载连接列表"""
@@ -375,6 +691,35 @@ class ConnectionDialog(QDialog):
             item.setText(1, conn.type)
             
             if conn.type == "mysql":
+                config = conn.config
+                host_info = f"{config.get('host', '')}:{config.get('port', '')}"
+                item.setText(2, host_info)
+                item.setText(3, config.get('database', ''))
+            elif conn.type == "postgresql":
+                config = conn.config
+                host_info = f"{config.get('host', '')}:{config.get('port', '')}"
+                item.setText(2, host_info)
+                item.setText(3, config.get('database', ''))
+            elif conn.type == "oracle":
+                config = conn.config
+                host_info = f"{config.get('host', '')}:{config.get('port', '')}"
+                item.setText(2, host_info)
+                item.setText(3, config.get('service_name', ''))
+            elif conn.type == "sqlserver":
+                config = conn.config
+                host_info = f"{config.get('host', '')}:{config.get('port', '')}"
+                item.setText(2, host_info)
+                item.setText(3, config.get('database', ''))
+            elif conn.type == "sqlite":
+                config = conn.config
+                item.setText(2, tr("local_file"))
+                item.setText(3, config.get('file', ''))
+            elif conn.type == "mongodb":
+                config = conn.config
+                host_info = f"{config.get('host', '')}:{config.get('port', '')}"
+                item.setText(2, host_info)
+                item.setText(3, config.get('database', ''))
+            elif conn.type == "db2":
                 config = conn.config
                 host_info = f"{config.get('host', '')}:{config.get('port', '')}"
                 item.setText(2, host_info)
@@ -400,15 +745,88 @@ class ConnectionDialog(QDialog):
                 
     def load_connection_details(self, connection):
         """加载连接详情"""
+        self.name_edit.setText(connection.name)
+        
         if connection.type == "mysql":
             config = connection.config
             
-            self.name_edit.setText(connection.name)
+            # 设置类型选择
+            self.type_combo.setCurrentText("MySQL")
+            
+            # 加载MySQL配置
             self.host_edit.setText(config.get('host', ''))
             self.port_edit.setText(str(config.get('port', '')))
             self.username_edit.setText(config.get('username', ''))
             self.password_edit.setText(config.get('password', ''))
             self.database_edit.setText(config.get('database', ''))
+            
+        elif connection.type == "postgresql":
+            config = connection.config
+            
+            # 设置类型选择
+            self.type_combo.setCurrentText("PostgreSQL")
+            
+            # 加载PostgreSQL配置
+            self.pg_host_edit.setText(config.get('host', ''))
+            self.pg_port_edit.setText(str(config.get('port', '')))
+            self.pg_username_edit.setText(config.get('username', ''))
+            self.pg_password_edit.setText(config.get('password', ''))
+            self.pg_database_edit.setText(config.get('database', ''))
+            
+        elif connection.type == "oracle":
+            config = connection.config
+            
+            # 设置类型选择
+            self.type_combo.setCurrentText("Oracle")
+            
+            # 加载Oracle配置
+            self.oracle_host_edit.setText(config.get('host', ''))
+            self.oracle_port_edit.setText(str(config.get('port', '')))
+            self.oracle_username_edit.setText(config.get('username', ''))
+            self.oracle_password_edit.setText(config.get('password', ''))
+            self.oracle_service_edit.setText(config.get('service_name', ''))
+            
+        elif connection.type == "sqlserver":
+            config = connection.config
+            
+            # 设置类型选择
+            self.type_combo.setCurrentText("SQL Server")
+            
+            # 加载SQL Server配置
+            self.sqlserver_host_edit.setText(config.get('host', ''))
+            self.sqlserver_port_edit.setText(str(config.get('port', '')))
+            self.sqlserver_username_edit.setText(config.get('username', ''))
+            self.sqlserver_password_edit.setText(config.get('password', ''))
+            self.sqlserver_database_edit.setText(config.get('database', ''))
+            self.sqlserver_driver_edit.setText(config.get('driver', ''))
+            
+        elif connection.type == "sqlite":
+            config = connection.config
+            
+            # 设置类型选择
+            self.type_combo.setCurrentText("SQLite")
+            
+            # 加载SQLite配置
+            self.sqlite_file_edit.setText(config.get('file', ''))
+            
+        elif connection.type == "mongodb":
+            config = connection.config
+            self.type_combo.setCurrentText("MongoDB")
+            self.mongodb_host_edit.setText(config.get('host', ''))
+            self.mongodb_port_edit.setText(str(config.get('port', '')))
+            self.mongodb_username_edit.setText(config.get('username', ''))
+            self.mongodb_password_edit.setText(config.get('password', ''))
+            self.mongodb_database_edit.setText(config.get('database', ''))
+            self.mongodb_auth_source_edit.setText(config.get('auth_source', ''))
+
+        elif connection.type == "db2":
+            config = connection.config
+            self.type_combo.setCurrentText("IBM Db2")
+            self.db2_host_edit.setText(config.get('host', ''))
+            self.db2_port_edit.setText(str(config.get('port', '')))
+            self.db2_username_edit.setText(config.get('username', ''))
+            self.db2_password_edit.setText(config.get('password', ''))
+            self.db2_database_edit.setText(config.get('database', ''))
             
     def add_connection(self):
         """添加连接"""
@@ -420,6 +838,49 @@ class ConnectionDialog(QDialog):
         self.password_edit.clear()
         self.database_edit.clear()
         
+        # 清空PostgreSQL表单
+        self.pg_host_edit.setText("localhost")
+        self.pg_port_edit.setText("5432")
+        self.pg_username_edit.clear()
+        self.pg_password_edit.clear()
+        self.pg_database_edit.clear()
+        
+        # 清空Oracle表单
+        self.oracle_host_edit.setText("localhost")
+        self.oracle_port_edit.setText("1521")
+        self.oracle_username_edit.clear()
+        self.oracle_password_edit.clear()
+        self.oracle_service_edit.clear()
+        
+        # 清空SQL Server表单
+        self.sqlserver_host_edit.setText("localhost")
+        self.sqlserver_port_edit.setText("1433")
+        self.sqlserver_username_edit.clear()
+        self.sqlserver_password_edit.clear()
+        self.sqlserver_database_edit.clear()
+        self.sqlserver_driver_edit.setText("ODBC Driver 17 for SQL Server")
+        
+        # 清空SQLite表单
+        self.sqlite_file_edit.clear()
+
+        # 清空MongoDB表单
+        self.mongodb_host_edit.setText("localhost")
+        self.mongodb_port_edit.setText("27017")
+        self.mongodb_username_edit.clear()
+        self.mongodb_password_edit.clear()
+        self.mongodb_database_edit.clear()
+        self.mongodb_auth_source_edit.setText("admin")
+
+        # 清空Db2表单
+        self.db2_host_edit.setText("localhost")
+        self.db2_port_edit.setText("50000")
+        self.db2_username_edit.clear()
+        self.db2_password_edit.clear()
+        self.db2_database_edit.clear()
+        
+        # 设置默认类型为MySQL
+        self.type_combo.setCurrentText("MySQL")
+        
         # 清空选择
         self.connection_tree.clearSelection()
         self.selected_connection = None
@@ -430,32 +891,188 @@ class ConnectionDialog(QDialog):
     def save_connection(self):
         """保存连接"""
         name = self.name_edit.text().strip()
-        host = self.host_edit.text().strip()
-        port = int(self.port_edit.text().strip() or "3306")
-        username = self.username_edit.text().strip()
-        password = self.password_edit.text()
-        database = self.database_edit.text().strip()
+        db_type = self.type_combo.currentData()
         
         if not name:
             QMessageBox.warning(self, tr("warning"), tr("connection_name_required"))
             return
+        
+        # 根据数据库类型获取配置
+        if db_type == "mysql":
+            host = self.host_edit.text().strip()
+            port = int(self.port_edit.text().strip() or "3306")
+            username = self.username_edit.text().strip()
+            password = self.password_edit.text()
+            database = self.database_edit.text().strip()
             
-        if not host:
-            QMessageBox.warning(self, tr("warning"), tr("host_required"))
-            return
+            if not host:
+                QMessageBox.warning(self, tr("warning"), tr("host_required"))
+                return
+                
+            if not username:
+                QMessageBox.warning(self, tr("warning"), tr("username_required"))
+                return
+                
+            # 构建MySQL配置
+            config = {
+                'host': host,
+                'port': port,
+                'username': username,
+                'password': password,
+                'database': database
+            }
             
-        if not username:
-            QMessageBox.warning(self, tr("warning"), tr("username_required"))
-            return
+        elif db_type == "postgresql":
+            host = self.pg_host_edit.text().strip()
+            port = int(self.pg_port_edit.text().strip() or "5432")
+            username = self.pg_username_edit.text().strip()
+            password = self.pg_password_edit.text()
+            database = self.pg_database_edit.text().strip()
             
-        # 构建配置
-        config = {
-            'host': host,
-            'port': port,
-            'username': username,
-            'password': password,
-            'database': database
-        }
+            if not host:
+                QMessageBox.warning(self, tr("warning"), tr("host_required"))
+                return
+                
+            if not username:
+                QMessageBox.warning(self, tr("warning"), tr("username_required"))
+                return
+                
+            # 构建PostgreSQL配置
+            config = {
+                'host': host,
+                'port': port,
+                'username': username,
+                'password': password,
+                'database': database
+            }
+            
+        elif db_type == "oracle":
+            host = self.oracle_host_edit.text().strip()
+            port = int(self.oracle_port_edit.text().strip() or "1521")
+            username = self.oracle_username_edit.text().strip()
+            password = self.oracle_password_edit.text()
+            service_name = self.oracle_service_edit.text().strip()
+            
+            if not host:
+                QMessageBox.warning(self, tr("warning"), tr("host_required"))
+                return
+                
+            if not username:
+                QMessageBox.warning(self, tr("warning"), tr("username_required"))
+                return
+                
+            if not service_name:
+                QMessageBox.warning(self, tr("warning"), tr("service_name_required"))
+                return
+                
+            # 构建Oracle配置
+            config = {
+                'host': host,
+                'port': port,
+                'username': username,
+                'password': password,
+                'service_name': service_name
+            }
+            
+        elif db_type == "sqlserver":
+            host = self.sqlserver_host_edit.text().strip()
+            port = int(self.sqlserver_port_edit.text().strip() or "1433")
+            username = self.sqlserver_username_edit.text().strip()
+            password = self.sqlserver_password_edit.text()
+            database = self.sqlserver_database_edit.text().strip()
+            driver = self.sqlserver_driver_edit.text().strip()
+            
+            if not host:
+                QMessageBox.warning(self, tr("warning"), tr("host_required"))
+                return
+                
+            if not username:
+                QMessageBox.warning(self, tr("warning"), tr("username_required"))
+                return
+                
+            if not database:
+                QMessageBox.warning(self, tr("warning"), tr("database_required"))
+                return
+                
+            # 构建SQL Server配置
+            config = {
+                'host': host,
+                'port': port,
+                'username': username,
+                'password': password,
+                'database': database,
+                'driver': driver
+            }
+            
+        elif db_type == "sqlite":
+            file_path = self.sqlite_file_edit.text().strip()
+            
+            if not file_path:
+                QMessageBox.warning(self, tr("warning"), tr("database_file_path_required"))
+                return
+                
+            # 构建SQLite配置
+            config = {
+                'file': file_path
+            }
+
+        elif db_type == "mongodb":
+            host = self.mongodb_host_edit.text().strip()
+            port = int(self.mongodb_port_edit.text().strip() or "27017")
+            username = self.mongodb_username_edit.text().strip()
+            password = self.mongodb_password_edit.text()
+            database = self.mongodb_database_edit.text().strip()
+            auth_source = self.mongodb_auth_source_edit.text().strip()
+
+            if not host:
+                QMessageBox.warning(self, tr("warning"), tr("host_required"))
+                return
+
+            if not username:
+                QMessageBox.warning(self, tr("warning"), tr("username_required"))
+                return
+
+            if not database:
+                QMessageBox.warning(self, tr("warning"), tr("database_required"))
+                return
+
+            # 构建MongoDB配置
+            config = {
+                'host': host,
+                'port': port,
+                'username': username,
+                'password': password,
+                'database': database,
+                'auth_source': auth_source
+            }
+
+        elif db_type == "db2":
+            host = self.db2_host_edit.text().strip()
+            port = int(self.db2_port_edit.text().strip() or "50000")
+            username = self.db2_username_edit.text().strip()
+            password = self.db2_password_edit.text()
+            database = self.db2_database_edit.text().strip()
+
+            if not host:
+                QMessageBox.warning(self, tr("warning"), tr("host_required"))
+                return
+
+            if not username:
+                QMessageBox.warning(self, tr("warning"), tr("username_required"))
+                return
+
+            if not database:
+                QMessageBox.warning(self, tr("warning"), tr("database_required"))
+                return
+
+            # 构建Db2配置
+            config = {
+                'host': host,
+                'port': port,
+                'username': username,
+                'password': password,
+                'database': database
+            }
         
         try:
             # 调试信息
@@ -471,7 +1088,7 @@ class ConnectionDialog(QDialog):
                 connection = Connection(
                     id=self.selected_connection.id,
                     name=name,
-                    type="mysql",
+                    type=db_type,
                     config=config,
                     created_at=self.selected_connection.created_at,
                     updated_at=datetime.now()
@@ -482,7 +1099,7 @@ class ConnectionDialog(QDialog):
                 connection = Connection(
                     id=None,
                     name=name,
-                    type="mysql",
+                    type=db_type,
                     config=config,
                     created_at=datetime.now(),
                     updated_at=datetime.now()
@@ -491,6 +1108,12 @@ class ConnectionDialog(QDialog):
                 
             # 重新加载连接列表
             self.load_connections()
+            
+            # 显示成功提示
+            if self.selected_connection:
+                QMessageBox.information(self, tr("info"), tr("connection_update_success"))
+            else:
+                QMessageBox.information(self, tr("info"), tr("connection_create_success"))
             
             # 如果是新建连接，清空表单
             if not self.selected_connection:
@@ -514,7 +1137,7 @@ class ConnectionDialog(QDialog):
         reply = QMessageBox.question(
             self, 
             tr("confirm"), 
-            "确定要删除这个连接吗？",
+            tr("confirm_delete_connection"),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         
@@ -525,19 +1148,142 @@ class ConnectionDialog(QDialog):
             
     def test_connection(self):
         """测试连接"""
+        db_type = self.type_combo.currentData()
+        
         try:
-            config = {
-                "host": self.host_edit.text().strip(),
-                "port": int(self.port_edit.text().strip() or "3306"),
-                "user": self.username_edit.text().strip(),
-                "password": self.password_edit.text(),
-                "database": self.database_edit.text().strip()
-            }
-            
-            # 尝试建立连接
-            import mysql.connector
-            conn = mysql.connector.connect(**config)
-            conn.close()
+            if db_type == "mysql":
+                config = {
+                    "host": self.host_edit.text().strip(),
+                    "port": int(self.port_edit.text().strip() or "3306"),
+                    "user": self.username_edit.text().strip(),
+                    "password": self.password_edit.text(),
+                    "database": self.database_edit.text().strip()
+                }
+                
+                # 尝试建立MySQL连接
+                import mysql.connector
+                conn = mysql.connector.connect(**config)
+                conn.close()
+                
+            elif db_type == "postgresql":
+                config = {
+                    "host": self.pg_host_edit.text().strip(),
+                    "port": int(self.pg_port_edit.text().strip() or "5432"),
+                    "user": self.pg_username_edit.text().strip(),
+                    "password": self.pg_password_edit.text(),
+                    "database": self.pg_database_edit.text().strip()
+                }
+                
+                # 尝试建立PostgreSQL连接
+                try:
+                    import psycopg2
+                    conn = psycopg2.connect(**config)
+                    conn.close()
+                except ImportError:
+                    QMessageBox.warning(self, tr("warning"), tr("postgresql_driver_not_installed"))
+                    return
+                    
+            elif db_type == "oracle":
+                config = {
+                    "host": self.oracle_host_edit.text().strip(),
+                    "port": int(self.oracle_port_edit.text().strip() or "1521"),
+                    "user": self.oracle_username_edit.text().strip(),
+                    "password": self.oracle_password_edit.text(),
+                    "service_name": self.oracle_service_edit.text().strip()
+                }
+                
+                # 尝试建立Oracle连接
+                try:
+                    import cx_Oracle
+                    dsn = cx_Oracle.makedsn(config["host"], config["port"], service_name=config["service_name"])
+                    conn = cx_Oracle.connect(user=config["user"], password=config["password"], dsn=dsn)
+                    conn.close()
+                except ImportError:
+                    QMessageBox.warning(self, tr("warning"), tr("oracle_driver_not_installed"))
+                    return
+                    
+            elif db_type == "sqlserver":
+                config = {
+                    "host": self.sqlserver_host_edit.text().strip(),
+                    "port": int(self.sqlserver_port_edit.text().strip() or "1433"),
+                    "user": self.sqlserver_username_edit.text().strip(),
+                    "password": self.sqlserver_password_edit.text(),
+                    "database": self.sqlserver_database_edit.text().strip(),
+                    "driver": self.sqlserver_driver_edit.text().strip()
+                }
+                
+                # 尝试建立SQL Server连接
+                try:
+                    import pyodbc
+                    conn_str = f"DRIVER={{{config['driver']}}};SERVER={config['host']};PORT={config['port']};DATABASE={config['database']};UID={config['user']};PWD={config['password']}"
+                    conn = pyodbc.connect(conn_str)
+                    conn.close()
+                except ImportError:
+                    QMessageBox.warning(self, tr("warning"), tr("sqlserver_driver_not_installed"))
+                    return
+                    
+            elif db_type == "sqlite":
+                file_path = self.sqlite_file_edit.text().strip()
+                
+                if not file_path:
+                    QMessageBox.warning(self, tr("warning"), tr("database_file_path_required"))
+                    return
+                
+                # 尝试建立SQLite连接
+                try:
+                    import sqlite3
+                    conn = sqlite3.connect(file_path)
+                    conn.close()
+                except ImportError:
+                    # SQLite是Python内置模块，不应该出现ImportError
+                    QMessageBox.warning(self, tr("warning"), tr("sqlite_connection_error"))
+                    return
+
+            elif db_type == "mongodb":
+                config = {
+                    "host": self.mongodb_host_edit.text().strip(),
+                    "port": int(self.mongodb_port_edit.text().strip() or "27017"),
+                    "user": self.mongodb_username_edit.text().strip(),
+                    "password": self.mongodb_password_edit.text(),
+                    "database": self.mongodb_database_edit.text().strip(),
+                    "auth_source": self.mongodb_auth_source_edit.text().strip()
+                }
+                try:
+                    import pymongo
+                    client = pymongo.MongoClient(host=config["host"], port=config["port"])
+                    if config["user"] and config["password"]:
+                        client.admin.authenticate(config["user"], config["password"])
+                    db = client[config["database"]]
+                    if config["auth_source"] and config["auth_source"] != "admin":
+                        db = client[config["database"]][config["auth_source"]]
+                    db.command("ping")
+                    client.close()
+                except ImportError:
+                    QMessageBox.warning(self, tr("warning"), tr("mongodb_driver_not_installed"))
+                    return
+                except Exception as e:
+                    QMessageBox.warning(self, tr("warning"), tr("mongodb_connection_failed").format(error=str(e)))
+                    return
+
+            elif db_type == "db2":
+                config = {
+                    "host": self.db2_host_edit.text().strip(),
+                    "port": int(self.db2_port_edit.text().strip() or "50000"),
+                    "user": self.db2_username_edit.text().strip(),
+                    "password": self.db2_password_edit.text(),
+                    "database": self.db2_database_edit.text().strip()
+                }
+                try:
+                    import ibm_db
+                    conn_str = f"DATABASE={config['database']};HOSTNAME={config['host']};PORT={config['port']};PROTOCOL=TCPIP;UID={config['user']};PWD={config['password']}"
+                    conn = ibm_db.connect(conn_str, "", "")
+                    ibm_db.close(conn)
+                except ImportError:
+                    QMessageBox.warning(self, tr("warning"), tr("db2_driver_not_installed"))
+                    return
+                except Exception as e:
+                    QMessageBox.warning(self, tr("warning"), tr("db2_connection_failed").format(error=str(e)))
+                    return
             
             QMessageBox.information(self, tr("info"), tr("connection_test_success"))
         except Exception as e:
@@ -750,6 +1496,35 @@ class SelectConnectionDialog(QDialog):
             item.setText(1, conn.type)
             
             if conn.type == "mysql":
+                config = conn.config
+                host_info = f"{config.get('host', '')}:{config.get('port', '')}"
+                item.setText(2, host_info)
+                item.setText(3, config.get('database', ''))
+            elif conn.type == "postgresql":
+                config = conn.config
+                host_info = f"{config.get('host', '')}:{config.get('port', '')}"
+                item.setText(2, host_info)
+                item.setText(3, config.get('database', ''))
+            elif conn.type == "oracle":
+                config = conn.config
+                host_info = f"{config.get('host', '')}:{config.get('port', '')}"
+                item.setText(2, host_info)
+                item.setText(3, config.get('service_name', ''))
+            elif conn.type == "sqlserver":
+                config = conn.config
+                host_info = f"{config.get('host', '')}:{config.get('port', '')}"
+                item.setText(2, host_info)
+                item.setText(3, config.get('database', ''))
+            elif conn.type == "sqlite":
+                config = conn.config
+                item.setText(2, tr("local_file"))
+                item.setText(3, config.get('file', ''))
+            elif conn.type == "mongodb":
+                config = conn.config
+                host_info = f"{config.get('host', '')}:{config.get('port', '')}"
+                item.setText(2, host_info)
+                item.setText(3, config.get('database', ''))
+            elif conn.type == "db2":
                 config = conn.config
                 host_info = f"{config.get('host', '')}:{config.get('port', '')}"
                 item.setText(2, host_info)

@@ -24,8 +24,7 @@ class AboutDialog(QDialog):
         
         self.setWindowTitle(tr("about"))
         self.setModal(True)
-        self.setGeometry(300, 200, 550, 500)
-        self.setFixedSize(550, 500)  # 增加对话框大小
+        self.setGeometry(300, 200, 550, 300)
         self.center_on_screen()
         
         # 应用Windows 11风格样式

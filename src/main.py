@@ -1,5 +1,5 @@
 """
-MySQL表结构比较工具 - PyQt6版本
+数据库表结构比较工具 - PyQt6版本
 主应用程序
 """
 
@@ -28,7 +28,7 @@ from src.i18n.i18n_manager import get_i18n_manager, tr
 from src.utils.icon_manager import setup_window_icon, setup_application_icon
 
 class SQLCompareApp(QMainWindow):
-    """MySQL表结构比较工具主窗口"""
+    """数据库表结构比较工具主窗口"""
     
     def __init__(self, connection_manager):
         super().__init__()
@@ -41,6 +41,10 @@ class SQLCompareApp(QMainWindow):
         self.ignore_case = True  # 是否忽略大小写
         self.left_tables = {}
         self.right_tables = {}
+        
+        # 数据库类型跟踪
+        self.left_db_type = None
+        self.right_db_type = None
         
         # 搜索相关变量
         self.search_highlight_color = QColor(255, 255, 0, 100)  # 黄色半透明高亮
@@ -920,13 +924,37 @@ class SQLCompareApp(QMainWindow):
         if not left_display or not right_display or left_display.strip() == "" or right_display.strip() == "":
             QMessageBox.warning(self, tr("warning"), tr("please_select_two_data_sources"))
             return
+        
+        # 检查数据库类型兼容性
+        if not self._check_database_compatibility():
+            return
             
         # 执行比较
         self.show_differences()
         
         # 启用行选择同步功能
         self.sync_row_selection_enabled = True
+    
+    def _check_database_compatibility(self):
+        """检查数据库类型兼容性"""
+        # 如果两侧都是数据库连接，检查类型是否相同
+        if self.left_db_type and self.right_db_type:
+            if self.left_db_type != self.right_db_type:
+                QMessageBox.warning(
+                    self, 
+                    tr("warning"), 
+                    tr("database_type_mismatch").format(left_type=self.left_db_type, right_type=self.right_db_type)
+                )
+                return False
         
+        # 如果一侧是文件，另一侧是数据库，检查文件类型是否与数据库类型兼容
+        if (self.left_db_type and not self.right_db_type) or (not self.left_db_type and self.right_db_type):
+            # 这里可以添加文件类型检测逻辑
+            # 目前假设文件类型与数据库类型兼容
+            pass
+            
+        return True
+
     def show_differences(self):
         """显示差异"""
         # 禁用行选择同步，避免在数据加载过程中触发
@@ -1105,9 +1133,15 @@ class SQLCompareApp(QMainWindow):
         elif not self.right_tables:
             QMessageBox.warning(self, tr("warning"), tr("please_load_right_table_structure"))
             return
+        
+        # 确定目标数据库类型
+        target_db_type = self._determine_target_database_type()
+        if not target_db_type:
+            QMessageBox.warning(self, tr("warning"), tr("cannot_determine_target_database_type"))
+            return
             
         # 创建目标库选择对话框
-        dialog = TargetDatabaseDialog(self, self.connection_manager)
+        dialog = TargetDatabaseDialog(self, self.connection_manager, target_db_type)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             target_side = dialog.target_side
             left_name = dialog.left_name
@@ -1116,11 +1150,19 @@ class SQLCompareApp(QMainWindow):
             try:
                 if target_side == "right":
                     # 以右侧为目标库，将左侧结构同步到右侧
-                    sync_sql = self.sql_generator.generate_sync_sql(self.left_tables, self.right_tables)
+                    sync_sql = self.sql_generator.generate_sync_sql(
+                        self.left_tables, 
+                        self.right_tables, 
+                        target_db_type
+                    )
                     title = tr("sync_sql_title_right").format(left_name=left_name, right_name=right_name)
                 else:
                     # 以左侧为目标库，将右侧结构同步到左侧
-                    sync_sql = self.sql_generator.generate_sync_sql(self.right_tables, self.left_tables)
+                    sync_sql = self.sql_generator.generate_sync_sql(
+                        self.right_tables, 
+                        self.left_tables, 
+                        target_db_type
+                    )
                     title = tr("sync_sql_title_left").format(right_name=right_name, left_name=left_name)
                 
                 # 显示SQL窗口
@@ -1128,7 +1170,18 @@ class SQLCompareApp(QMainWindow):
                 
             except Exception as e:
                 QMessageBox.critical(self, tr("error"), f"{tr('generate_sync_sql_error')}:\n{str(e)}")
-                
+    
+    def _determine_target_database_type(self):
+        """确定目标数据库类型"""
+        # 优先使用数据库连接的类型
+        if self.left_db_type:
+            return self.left_db_type
+        elif self.right_db_type:
+            return self.right_db_type
+        
+        # 如果都是文件，默认使用MySQL类型
+        return "mysql"
+
     def show_sql_window(self, title, sql_content):
         """显示SQL窗口"""
         dialog = QDialog(self)
@@ -1472,22 +1525,34 @@ class SQLCompareApp(QMainWindow):
                     # 解析SQL文件
                     if side == "left":
                         self.left_tables = self.sql_parser.parse_file(history.value)
+                        self.left_db_type = None  # 文件类型未知
                     else:
                         self.right_tables = self.sql_parser.parse_file(history.value)
+                        self.right_db_type = None  # 文件类型未知
                     
                     # 显示表结构
                     self.show_tables(side)
                 elif history.type == "connection":
                     # 获取连接信息
                     conn = self.connection_manager.get_connection(history.value)
-                    if conn.type == "mysql":
+                    if conn.type in ["mysql", "postgresql"]:
                         try:
                             # 连接到数据库
                             db_config = conn.config.copy()
                             db_config['user'] = db_config.pop('username')
-                            self.db_connector.connect(db_config)
+                            
+                            # 设置数据库类型
+                            if side == "left":
+                                self.left_db_type = conn.type
+                            else:
+                                self.right_db_type = conn.type
+                            
+                            # 连接到数据库
+                            self.db_connector.connect(db_config, conn.type)
+                            
                             # 获取表结构
                             tables = self.db_connector.get_table_structure()
+                            
                             # 关闭连接
                             self.db_connector.close()
                             
@@ -1514,13 +1579,27 @@ class SQLCompareApp(QMainWindow):
     def on_connection_selected(self, side, connection):
         """连接选择回调"""
         # 生成显示文本
-        if connection.type == "mysql":
+        if connection.type in ["mysql", "postgresql", "oracle", "sqlserver", "mongodb", "db2"]:
             config = connection.config
-            database_name = config.get('database', '')
-            if database_name:
-                display = f"{connection.name} ({config['host']}:{config['port']}/{database_name})"
+            if connection.type == "oracle":
+                service_name = config.get('service_name', '')
+                if service_name:
+                    display = f"{connection.name} ({config['host']}:{config['port']}/{service_name})"
+                else:
+                    display = f"{connection.name} ({config['host']}:{config['port']})"
             else:
-                display = f"{connection.name} ({config['host']}:{config['port']})"
+                database_name = config.get('database', '')
+                if database_name:
+                    display = f"{connection.name} ({config['host']}:{config['port']}/{database_name})"
+                else:
+                    display = f"{connection.name} ({config['host']}:{config['port']})"
+        elif connection.type == "sqlite":
+            config = connection.config
+            file_path = config.get('file', '')
+            if file_path:
+                display = f"{connection.name} ({tr('file')}: {file_path})"
+            else:
+                display = f"{connection.name} (SQLite)"
         else:
             display = f"{connection.name} ({connection.config['url']})"
             
@@ -1538,21 +1617,39 @@ class SQLCompareApp(QMainWindow):
         # 更新历史记录列表
         self.update_history_lists()
         
-        # 设置当前选择
+        # 暂时断开历史记录组合框的信号连接，避免重复触发
         if side == "left":
+            self.left_history_combo.currentTextChanged.disconnect()
             self.left_history_combo.setCurrentText(display)
+            self.left_history_combo.currentTextChanged.connect(
+                lambda text: self.on_history_select("left", text)
+            )
         else:
+            self.right_history_combo.currentTextChanged.disconnect()
             self.right_history_combo.setCurrentText(display)
+            self.right_history_combo.currentTextChanged.connect(
+                lambda text: self.on_history_select("right", text)
+            )
             
         # 从数据库获取表结构
-        if connection.type == "mysql":
+        if connection.type in ["mysql", "postgresql", "oracle", "sqlserver", "sqlite", "mongodb", "db2"]:
             try:
                 # 连接到数据库
                 db_config = connection.config.copy()
                 db_config['user'] = db_config.pop('username')
-                self.db_connector.connect(db_config)
+                
+                # 设置数据库类型
+                if side == "left":
+                    self.left_db_type = connection.type
+                else:
+                    self.right_db_type = connection.type
+                
+                # 连接到数据库
+                self.db_connector.connect(db_config, connection.type)
+                
                 # 获取表结构
                 tables = self.db_connector.get_table_structure()
+                
                 # 关闭连接
                 self.db_connector.close()
                 
@@ -1565,7 +1662,7 @@ class SQLCompareApp(QMainWindow):
                 # 显示表结构
                 self.show_tables(side)
             except Exception as e:
-                QMessageBox.critical(self, "错误", f"获取表结构失败: {str(e)}")
+                QMessageBox.critical(self, tr("error"), f"{tr('get_table_structure_failed')}: {str(e)}")
         elif connection.type == "agent":
             QMessageBox.information(self, tr("info"), tr("agent_connection_not_supported"))
         
@@ -1626,9 +1723,10 @@ class SQLCompareApp(QMainWindow):
 class TargetDatabaseDialog(QDialog):
     """目标数据库选择对话框"""
     
-    def __init__(self, parent, connection_manager):
+    def __init__(self, parent, connection_manager, target_db_type="mysql"):
         super().__init__(parent)
         self.connection_manager = connection_manager
+        self.target_db_type = target_db_type
         self.target_side = "right"
         self.left_name = tr("left_data_source")
         self.right_name = tr("right_data_source")
@@ -1764,6 +1862,11 @@ class TargetDatabaseDialog(QDialog):
         desc_label.setStyleSheet("color: #666; font-size: 12px; margin-bottom: 10px;")
         desc_label.setWordWrap(True)
         layout.addWidget(desc_label)
+        
+        # 数据库类型信息
+        db_type_label = QLabel(tr("target_database_type").format(db_type=self.target_db_type.upper()))
+        db_type_label.setStyleSheet("color: #0078d4; font-weight: bold; font-size: 12px;")
+        layout.addWidget(db_type_label)
         
         # 获取左右数据库的名称
         left_history = self.connection_manager.get_history("left")
